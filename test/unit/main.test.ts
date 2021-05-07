@@ -1,6 +1,7 @@
-import {assert} from "chai";
-import {loop} from "../../src/main";
-import {Game, Memory} from "./mock"
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+import { Game, Memory } from "./mock";
+import { assert } from "chai";
+import { loop } from "../../src/main";
 
 describe("main", () => {
   before(() => {
