@@ -3,7 +3,7 @@ export const Harvester = {
   max: 2,
 
   run(creep: Creep): void {
-    if (creep.carry.energy < creep.carryCapacity) {
+    if (creep.store.energy < creep.store.getCapacity()) {
       const sources = creep.room.find(FIND_SOURCES);
       if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
         creep.moveTo(sources[0], { visualizePathStyle: { stroke: "#ffaa00" } });
@@ -24,8 +24,13 @@ export const Harvester = {
           creep.moveTo(targets[0], { visualizePathStyle: { stroke: "#ffffff" } });
         }
       } else {
-        // Make it known that I'm waiting
-        creep.memory.working = false;
+        // Upgrade controller if nothing else to do
+        if (creep.room.controller && creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: "#ffffff" } });
+        } else {
+          // Make it known that I'm waiting
+          creep.memory.working = false;
+        }
       }
     }
   },
