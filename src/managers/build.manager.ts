@@ -143,6 +143,42 @@ export default class BuildManager {
     spawn.spawnCreep([WORK, CARRY, MOVE], name, { memory: { role: this.role, building: false } });
   }
 
+  private createBuildJob(type: BuildType, path: PathStep[], origin: RoomPosition, goal: PathDestination): BuildJob {
+    // TODO: this is currently only set up for road-style jobs
+    const job: BuildJob = {
+      id: v4() as Id<BuildJob>,
+      type,
+      pathStr: Room.serializePath(path),
+      complete: false,
+      origin,
+      goal
+    };
+
+    return job;
+  }
+
+  public buildRoadFromTo(from: RoomPosition, to: RoomPosition, opts?: FindPathOpts): BuildJob {
+    // Find the best path from the origin to the destination
+    const path = this.room.findPath(from, to, opts);
+    const goal: PathDestination = {
+      x: to.x,
+      y: to.y,
+      range: opts && opts.range ? opts.range : 0,
+      roomName: this.room.name
+    };
+
+    const job = this.createBuildJob("road", path, from, goal);
+
+    // Queue job and its construction sites
+    this.schedule.jobs.push(job);
+    path.forEach(step => {
+      this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
+    });
+
+    // Queue job
+    return job;
+  }
+
   public buildRoadSpawnToCtrl(): void {
     const roadFromSpawnToCtrl = this.schedule.state.roadFromSpawnToCtrl;
     if (!roadFromSpawnToCtrl.inprogress && !roadFromSpawnToCtrl.complete) {
@@ -150,35 +186,14 @@ export default class BuildManager {
 
       // TODO: handle multiple spawns?
       const spawn = this.room.find(FIND_MY_SPAWNS)[0];
-      const ctrlDest: PathDestination = {
-        x: this.room.controller.pos.x,
-        y: this.room.controller.pos.y,
-        range: 1,
-        roomName: this.room.name
-      };
-
-      // Find the best path from the spawn to the ctrl
-      const ctrlPos = new RoomPosition(ctrlDest.x, ctrlDest.y, ctrlDest.roomName);
-      const pathSteps = this.room.findPath(spawn.pos, ctrlPos, { range: ctrlDest.range });
 
       // Add a new job to this room's schedule
-      const job: BuildJob = {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        id: v4() as Id<BuildJob>,
-        type: "road",
-        pathStr: Room.serializePath(pathSteps),
-        complete: false,
-        origin: spawn.pos,
-        goal: ctrlDest
-      };
-      this.schedule.jobs.push(job);
+      const ctrlPos = this.room.controller.pos;
+      const job = this.buildRoadFromTo(spawn.pos, ctrlPos, { range: 1 });
+
+      // Link new job to the room's state
       roadFromSpawnToCtrl.jobId = job.id;
       roadFromSpawnToCtrl.inprogress = true;
-
-      // Build construction sites for this job
-      pathSteps.forEach(step => {
-        this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
-      });
     } else if (roadFromSpawnToCtrl.inprogress && roadFromSpawnToCtrl.jobId) {
       // This road has been started, so let's check if it's complete
       const jobRoadSpawnToCtrl = this.getJob(roadFromSpawnToCtrl.jobId);
