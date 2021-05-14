@@ -1,4 +1,4 @@
-// import { v4 } from "uuid";
+import { v4 } from "uuid";
 
 /* eslint-disable no-underscore-dangle */
 export default class BuildManager {
@@ -19,55 +19,7 @@ export default class BuildManager {
     // TODO
 
     // If we haven't started building a road from spawn to ctlr
-    // TODO: handle multiple spawns?
-    const roadFromSpawnToCtrl = this.schedule.state.roadFromSpawnToCtrl;
-    if (!roadFromSpawnToCtrl.inprogress && !roadFromSpawnToCtrl.complete) {
-      if (!this.room.controller) throw new Error("Room has no controller");
-
-      const spawn = this.room.find(FIND_MY_SPAWNS)[0];
-      const ctrlDest: PathDestination = {
-        x: this.room.controller.pos.x,
-        y: this.room.controller.pos.y,
-        range: 1,
-        roomName: this.room.name
-      };
-
-      // Find the best path from the spawn to the ctrl
-      const ctrlPos = new RoomPosition(ctrlDest.x, ctrlDest.y, ctrlDest.roomName);
-      const pathSteps = this.room.findPath(spawn.pos, ctrlPos, { range: ctrlDest.range });
-
-      // Add a new job to this room's schedule
-      const job: BuildJob = {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        // id: v4() as Id<BuildJob>,
-        id: "test" as Id<BuildJob>,
-        type: "road",
-        pathStr: Room.serializePath(pathSteps),
-        complete: false,
-        origin: spawn.pos,
-        goal: ctrlDest
-      };
-      this.schedule.jobs.push(job);
-      roadFromSpawnToCtrl.jobId = job.id;
-      roadFromSpawnToCtrl.inprogress = true;
-
-      // Build construction sites for this job
-      pathSteps.forEach(step => {
-        this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
-      });
-    } else if (roadFromSpawnToCtrl.inprogress && roadFromSpawnToCtrl.jobId) {
-      // This road has been started, so let's check if it's complete
-      const jobRoadSpawnToCtrl = this.getJob(roadFromSpawnToCtrl.jobId);
-      if (!jobRoadSpawnToCtrl) throw new Error("No job for road from spawn to ctrl");
-
-      // If complete, toggle state flags and wipe ref to job since it will be wiped
-      // from the schedule.
-      if (jobRoadSpawnToCtrl.complete) {
-        roadFromSpawnToCtrl.inprogress = false;
-        roadFromSpawnToCtrl.complete = true;
-        delete roadFromSpawnToCtrl.jobId;
-      }
-    }
+    this.buildRoadSpawnToCtrl();
 
     // Clear out completed jobs
     this.schedule.jobs = this.schedule.jobs.filter(j => !j.complete);
@@ -189,5 +141,56 @@ export default class BuildManager {
     const name = `Builder${Game.time}`;
     console.log("Spawning new builder: " + name);
     spawn.spawnCreep([WORK, CARRY, MOVE], name, { memory: { role: this.role, building: false } });
+  }
+
+  public buildRoadSpawnToCtrl(): void {
+    const roadFromSpawnToCtrl = this.schedule.state.roadFromSpawnToCtrl;
+    if (!roadFromSpawnToCtrl.inprogress && !roadFromSpawnToCtrl.complete) {
+      if (!this.room.controller) throw new Error("Room has no controller");
+
+      // TODO: handle multiple spawns?
+      const spawn = this.room.find(FIND_MY_SPAWNS)[0];
+      const ctrlDest: PathDestination = {
+        x: this.room.controller.pos.x,
+        y: this.room.controller.pos.y,
+        range: 1,
+        roomName: this.room.name
+      };
+
+      // Find the best path from the spawn to the ctrl
+      const ctrlPos = new RoomPosition(ctrlDest.x, ctrlDest.y, ctrlDest.roomName);
+      const pathSteps = this.room.findPath(spawn.pos, ctrlPos, { range: ctrlDest.range });
+
+      // Add a new job to this room's schedule
+      const job: BuildJob = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        id: v4() as Id<BuildJob>,
+        type: "road",
+        pathStr: Room.serializePath(pathSteps),
+        complete: false,
+        origin: spawn.pos,
+        goal: ctrlDest
+      };
+      this.schedule.jobs.push(job);
+      roadFromSpawnToCtrl.jobId = job.id;
+      roadFromSpawnToCtrl.inprogress = true;
+
+      // Build construction sites for this job
+      pathSteps.forEach(step => {
+        this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
+      });
+    } else if (roadFromSpawnToCtrl.inprogress && roadFromSpawnToCtrl.jobId) {
+      // This road has been started, so let's check if it's complete
+      const jobRoadSpawnToCtrl = this.getJob(roadFromSpawnToCtrl.jobId);
+      if (!jobRoadSpawnToCtrl) throw new Error("No job for road from spawn to ctrl");
+
+      // If complete, toggle state flags and wipe ref to job since it will be wiped
+      // from the schedule.
+      if (jobRoadSpawnToCtrl.complete) {
+        roadFromSpawnToCtrl.inprogress = false;
+        roadFromSpawnToCtrl.complete = true;
+        delete roadFromSpawnToCtrl.jobId;
+      }
+    }
   }
 }
