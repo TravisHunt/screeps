@@ -43,6 +43,7 @@
     "@types/screeps-profiler": "^1.2.2",
     "@types/sinon": "^5.0.5",
     "@types/sinon-chai": "^3.2.0",
+    "@types/uuid": "^8.3.0",
     "@typescript-eslint/eslint-plugin": "^3.7.0",
     "@typescript-eslint/parser": "^3.7.0",
     "@typescript-eslint/typescript-estree": "^3.7.0",
@@ -66,7 +67,9 @@
     "typescript": "^3.8.3"
   },
   "dependencies": {
+    "polyfill-crypto.getrandomvalues": "^1.0.0",
     "screeps-profiler": "^2.0.1",
-    "source-map": "~0.6.1"
+    "source-map": "~0.6.1",
+    "uuid": "^8.3.2"
   }
 }
