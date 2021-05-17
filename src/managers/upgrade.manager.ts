@@ -1,20 +1,34 @@
-/* eslint-disable no-underscore-dangle */
+import ManagerBase from "managers/base.manager";
 import { palette } from "path.palette";
 
-export default class UpgradeManager {
+export default class UpgradeManager extends ManagerBase {
   public static readonly role = "upgrader";
+  public readonly room: Room;
   public readonly creepMax: number;
   public creeps: Creep[];
-  private _openPositions: number;
 
-  public constructor(max: number, creeps: Creep[]) {
+  public constructor(room: Room, max: number) {
+    super();
+    this.room = room;
     this.creepMax = max;
-    this.creeps = creeps;
-    this._openPositions = max - creeps.length;
+    this.creeps = _.filter(
+      Game.creeps,
+      (creep: Creep) => creep.memory.role === UpgradeManager.role && creep.room.name === this.room.name
+    );
   }
 
-  public get openPositions(): number {
-    return this._openPositions;
+  public run(): void {
+    // TODO: handle multiple spawns?
+    const spawn = this.room.find(FIND_MY_SPAWNS)[0];
+
+    // create upgraders if we don't have enough
+    if (this.creeps.length < this.creepMax && !spawn.spawning) {
+      UpgradeManager.create(spawn);
+    }
+
+    for (const creep of this.creeps) {
+      UpgradeManager.doYourJob(creep);
+    }
   }
 
   public static doYourJob(creep: Creep): void {
@@ -51,7 +65,8 @@ export default class UpgradeManager {
 
   public static create(spawn: StructureSpawn): void {
     const name = `Upgrader${Game.time}`;
-    console.log("Spawning new upgrader: " + name);
-    spawn.spawnCreep([WORK, CARRY, MOVE], name, { memory: { role: this.role, upgrading: false } });
+    const parts = [WORK, CARRY, MOVE];
+    const opts = { memory: { role: this.role, upgrading: false } };
+    if (spawn.spawnCreep(parts, name, opts) === OK) console.log("Spawning new upgrader: " + name);
   }
 }

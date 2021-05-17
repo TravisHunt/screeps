@@ -1,13 +1,14 @@
+import ManagerBase from "managers/base.manager";
 import { palette } from "path.palette";
-import { Harvester } from "roles/harvester";
 
-export default class HarvestManager {
+export default class HarvestManager extends ManagerBase {
   public static readonly roleHarvester = "harvester";
   public readonly harvesterMax: number;
   public harvesters: Creep[];
   private room: Room;
 
   public constructor(room: Room, harvesterMax: number) {
+    super();
     this.room = room;
     this.harvesterMax = harvesterMax;
     this.harvesters = _.filter(

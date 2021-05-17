@@ -6,6 +6,7 @@ import UpgradeManager from "managers/upgrade.manager";
 const HARVESTER_MAX = 2;
 const BUILDER_MAX = 2;
 const REPAIRMAN_MAX = 1;
+const UPGRADER_MAX = 1;
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
@@ -22,13 +23,6 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
   const spawn1 = Game.spawns.Spawn1;
 
-  // Get upgraders
-  const currentUpgraders = _.filter(Game.creeps, (creep: Creep) => creep.memory.role === UpgradeManager.role);
-  const upgradeManager = new UpgradeManager(1, currentUpgraders);
-  if (upgradeManager.openPositions > 0) {
-    UpgradeManager.create(spawn1);
-  }
-
   // Visualize spawning
   if (spawn1.spawning) {
     const spawningCreep = Game.creeps[spawn1.spawning.name];
@@ -38,20 +32,12 @@ export const loop = ErrorMapper.wrapLoop(() => {
     });
   }
 
-  // Run harvesters
+  // Build and start managers for this room
   const harvestManager = new HarvestManager(spawn1.room, HARVESTER_MAX);
-  harvestManager.run();
-
-  // Run builders
   const buildManager = new BuildManager(spawn1.room, BUILDER_MAX, REPAIRMAN_MAX);
+  const upgradeManager = new UpgradeManager(spawn1.room, UPGRADER_MAX);
+
+  harvestManager.run();
   buildManager.run();
-
-  // Run creeps
-  for (const name in Game.creeps) {
-    const creep = Game.creeps[name];
-
-    if (creep.memory.role === UpgradeManager.role) {
-      UpgradeManager.doYourJob(creep);
-    }
-  }
+  upgradeManager.run();
 });

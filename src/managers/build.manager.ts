@@ -1,7 +1,7 @@
+import ManagerBase from "managers/base.manager";
 import { palette } from "path.palette";
 
-/* eslint-disable no-underscore-dangle */
-export default class BuildManager {
+export default class BuildManager extends ManagerBase {
   public static readonly roleBuilder = "builder";
   public static readonly roleRepairman = "repairman";
   public readonly builderMax: number;
@@ -11,6 +11,7 @@ export default class BuildManager {
   private room: Room;
 
   public constructor(room: Room, builderMax: number, repairmanMax: number) {
+    super();
     this.room = room;
     this.builderMax = builderMax;
     this.repairmanMax = repairmanMax;
@@ -182,7 +183,7 @@ export default class BuildManager {
     }
   }
 
-  public doYourJob(creep: Creep): void {
+  private doYourJob(creep: Creep): void {
     // TODO: make sure the creep is capable of this job
 
     // Harvest if you have no more energy
@@ -325,7 +326,7 @@ export default class BuildManager {
     return job;
   }
 
-  public buildRoadFromTo(from: RoomPosition, to: RoomPosition, opts?: FindPathOpts): BuildJob {
+  private buildRoadFromTo(from: RoomPosition, to: RoomPosition, opts?: FindPathOpts): BuildJob {
     // Find the best path from the origin to the destination
     const path = this.room.findPath(from, to, opts);
     const goal: PathDestination = {
@@ -347,7 +348,7 @@ export default class BuildManager {
     return job;
   }
 
-  public buildRoadSpawnToEnergySources(spawn: StructureSpawn): void {
+  private buildRoadSpawnToEnergySources(spawn: StructureSpawn): void {
     const jobState = this.schedule.state.roadFromSpawnToEnergySources;
     if (!jobState) throw new Error("Job State Not Configured: Road from spawn to sources.");
     if (jobState.complete) return;
@@ -386,7 +387,7 @@ export default class BuildManager {
     }
   }
 
-  public buildRoadSpawnToCtrl(spawn: StructureSpawn): void {
+  private buildRoadSpawnToCtrl(spawn: StructureSpawn): void {
     const roadFromSpawnToCtrl = this.schedule.state.roadFromSpawnToCtrl;
     if (!roadFromSpawnToCtrl.inprogress && !roadFromSpawnToCtrl.complete) {
       if (!this.room.controller) throw new Error("Room has no controller");
