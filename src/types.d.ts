@@ -8,6 +8,7 @@ interface CreepMemory {
   upgrading?: boolean;
   building?: boolean;
   jobId?: number;
+  buildTarget?: Id<ConstructionSite>;
 }
 
 type BuildSite = RoomPosition | RoomPosition[];

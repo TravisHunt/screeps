@@ -1,4 +1,4 @@
-// import { v4 } from "uuid";
+import { palette } from "path.palette";
 
 /* eslint-disable no-underscore-dangle */
 export default class BuildManager {
@@ -119,15 +119,50 @@ export default class BuildManager {
   }
 
   private repair(creep: Creep): void {
-    const repairTargets = creep.room.find(FIND_STRUCTURES, {
-      filter: object => object.hits < object.hitsMax
-    });
+    // Harvest if you have no more energy
+    if (creep.memory.building && creep.store.getUsedCapacity() === 0) {
+      creep.memory.building = false;
+      creep.say("🔄 harvest");
+    }
 
-    repairTargets.sort((a, b) => a.hits - b.hits);
+    // Build if you're at carrying capacity
+    if (!creep.memory.building && creep.store.energy === creep.store.getCapacity()) {
+      creep.memory.building = true;
+      creep.say("🚧 repair");
+    }
 
-    if (repairTargets.length > 0) {
-      if (creep.repair(repairTargets[0]) === ERR_NOT_IN_RANGE) {
-        creep.moveTo(repairTargets[0]);
+    if (creep.memory.building) {
+      // Prioritize build target if I have one
+      if (creep.memory.buildTarget) {
+        // Get construction site
+        const site = Game.getObjectById(creep.memory.buildTarget);
+        if (site && creep.build(site) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(site, { visualizePathStyle: { stroke: palette.build } });
+          return;
+        }
+      }
+
+      const repairTargets = creep.room.find(FIND_STRUCTURES, {
+        filter: object => object.hits < object.hitsMax
+      });
+
+      repairTargets.sort((a, b) => a.hits - b.hits);
+
+      if (repairTargets.length > 0) {
+        if (creep.repair(repairTargets[0]) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(repairTargets[0], { visualizePathStyle: { stroke: palette.repair } });
+        }
+      } else {
+        // If there's nothing to repair, see if there are any construction sites nearby
+        const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
+        if (site && creep.build(site) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(site, { visualizePathStyle: { stroke: palette.build } });
+        }
+      }
+    } else {
+      const sources = creep.room.find(FIND_SOURCES);
+      if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
+        creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
       }
     }
   }
@@ -149,26 +184,31 @@ export default class BuildManager {
 
     // Loop action: build site or harvest from energy source
     if (creep.memory.building) {
-      if (creep.memory.jobId) {
+      if (creep.memory.buildTarget || creep.memory.jobId) {
         // Find the first construction site within the job
-        const job = this.getJob(creep.memory.jobId);
-        if (!job) {
-          creep.say("ERR: Job Not Found");
-          return;
-        }
-
         let buildSite: ConstructionSite | null = null;
-        for (const pStr of job.pathStrings) {
-          const jobPath = Room.deserializePath(pStr);
+        let job: BuildJob | undefined;
 
-          for (const step of jobPath) {
-            const found = this.room.lookForAt(LOOK_CONSTRUCTION_SITES, step.x, step.y);
-            if (found.length) {
-              buildSite = found[0];
-              break;
-            }
+        if (creep.memory.buildTarget) {
+          buildSite = Game.getObjectById(creep.memory.buildTarget);
+        } else if (creep.memory.jobId) {
+          job = this.getJob(creep.memory.jobId);
+          if (!job) {
+            creep.say("ERR: Job Not Found");
+            return;
           }
-          if (buildSite) break;
+          for (const pStr of job.pathStrings) {
+            const jobPath = Room.deserializePath(pStr);
+
+            for (const step of jobPath) {
+              const found = this.room.lookForAt(LOOK_CONSTRUCTION_SITES, step.x, step.y);
+              if (found.length) {
+                buildSite = found[0];
+                break;
+              }
+            }
+            if (buildSite) break;
+          }
         }
 
         if (buildSite) {
@@ -178,34 +218,43 @@ export default class BuildManager {
               creep.say("🚧 build");
               break;
             case ERR_NOT_IN_RANGE:
-              creep.moveTo(buildSite, { visualizePathStyle: { stroke: "#ffffff" } });
+              creep.moveTo(buildSite, { visualizePathStyle: { stroke: palette.build } });
               break;
             case ERR_INVALID_TARGET:
               creep.say("ERR: INVALID TARGET");
-              job.complete = true;
+              if (creep.memory.buildTarget) delete creep.memory.buildTarget;
+              else if (job) job.complete = true;
               break;
             default:
               creep.say(`ERR: ${buildResponse}`);
           }
         } else {
           creep.say("ERR: I HAVE NO SITE");
-          job.complete = true;
+          if (creep.memory.buildTarget) delete creep.memory.buildTarget;
+          else if (job) job.complete = true;
         }
       } else {
-        creep.say("ERR: NO JOB");
+        // No job? Pick up an unassigned construction sites
+        const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
+        if (site) creep.memory.buildTarget = site.id;
       }
     } else {
       const sources = creep.room.find(FIND_SOURCES);
       if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
-        creep.moveTo(sources[0], { visualizePathStyle: { stroke: "#ffaa00" } });
+        creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
       }
     }
   }
 
   private static createBuilder(spawn: StructureSpawn): void {
     const name = `Builder${Game.time}`;
+    const parts =
+      spawn.store.getCapacity(RESOURCE_ENERGY) >= 550
+        ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]
+        : [WORK, CARRY, MOVE];
+
     console.log("Spawning new builder: " + name);
-    spawn.spawnCreep([WORK, CARRY, MOVE], name, { memory: { role: this.roleBuilder, building: false } });
+    spawn.spawnCreep(parts, name, { memory: { role: this.roleBuilder, building: false } });
   }
 
   private static createRepairman(spawn: StructureSpawn): void {

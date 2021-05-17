@@ -1,4 +1,6 @@
 /* eslint-disable no-underscore-dangle */
+import { palette } from "path.palette";
+
 export default class UpgradeManager {
   public static readonly role = "upgrader";
   public readonly creepMax: number;
@@ -34,7 +36,7 @@ export default class UpgradeManager {
     if (creep.memory.upgrading) {
       if (creep.room.controller) {
         if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-          creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: "#ffffff" } });
+          creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: palette.upgrade } });
         }
       } else {
         creep.say("ERROR: No ctrl");
@@ -42,7 +44,7 @@ export default class UpgradeManager {
     } else {
       const sources = creep.room.find(FIND_SOURCES);
       if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
-        creep.moveTo(sources[0], { visualizePathStyle: { stroke: "#ffaa00" } });
+        creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
       }
     }
   }
