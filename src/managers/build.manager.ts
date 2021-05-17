@@ -79,7 +79,7 @@ export default class BuildManager {
     }
 
     // Spawn repairman if we need one
-    if (this.repairmen.length < this.repairmanMax && !spawn.spawnCreep) {
+    if (this.repairmen.length < this.repairmanMax && !spawn.spawning) {
       BuildManager.createRepairman(spawn);
     }
 
