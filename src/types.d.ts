@@ -7,7 +7,7 @@ interface CreepMemory {
   working?: boolean;
   upgrading?: boolean;
   building?: boolean;
-  jobId?: Id<BuildJob>;
+  jobId?: number;
 }
 
 type BuildSite = RoomPosition | RoomPosition[];
@@ -21,9 +21,9 @@ interface PathDestination {
 }
 
 interface BuildJob {
-  id: Id<this>;
+  id: number;
   type: BuildType;
-  pathStr: string;
+  pathStrings: string[];
   complete: boolean;
   origin?: RoomPosition;
   goal?: PathDestination;
@@ -31,15 +31,17 @@ interface BuildJob {
 
 interface BuildSchedule {
   jobs: BuildJob[];
+  jobCounter: number;
   state: RoomBuildMasterList;
 }
 
 interface RoomBuildMasterList {
   roadFromSpawnToCtrl: RoomBuildJobState;
+  roadFromSpawnToEnergySources: RoomBuildJobState;
 }
 
 interface RoomBuildJobState {
   inprogress: boolean;
   complete: boolean;
-  jobId?: Id<BuildJob>;
+  jobId?: number;
 }

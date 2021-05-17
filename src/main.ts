@@ -4,6 +4,7 @@ import { Harvester } from "roles/harvester";
 import UpgradeManager from "managers/upgrade.manager";
 
 const BUILDERS_MAX = 2;
+const REPAIRMAN_MAX = 1;
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
@@ -43,7 +44,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   }
 
   // Run builders
-  const buildManager = new BuildManager(spawn1.room, BUILDERS_MAX);
+  const buildManager = new BuildManager(spawn1.room, BUILDERS_MAX, REPAIRMAN_MAX);
   buildManager.run();
 
   // Run creeps
