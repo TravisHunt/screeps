@@ -67,7 +67,6 @@
     "typescript": "^3.8.3"
   },
   "dependencies": {
-    "polyfill-crypto.getrandomvalues": "^1.0.0",
     "screeps-profiler": "^2.0.1",
     "source-map": "~0.6.1"
   }
