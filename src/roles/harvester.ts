@@ -11,7 +11,7 @@ export const Harvester = {
         creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
       }
     } else {
-      const targets = creep.room.find(FIND_STRUCTURES, {
+      const targets = creep.room.find(FIND_MY_STRUCTURES, {
         filter: structure => {
           return (
             (structure.structureType === STRUCTURE_EXTENSION ||
@@ -38,7 +38,7 @@ export const Harvester = {
           creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: palette.upgrade } });
         } else {
           // Make it known that I'm waiting
-          creep.memory.working = false;
+          // creep.memory.working = false;
         }
       }
     }
@@ -48,6 +48,6 @@ export const Harvester = {
     const name = `Harvester${Game.time}`;
     console.log("Spawning new harvester: " + name);
 
-    spawn.spawnCreep([WORK, CARRY, MOVE], name, { memory: { role: this.role, working: false } });
+    spawn.spawnCreep([WORK, CARRY, MOVE], name, { memory: { role: this.role } });
   }
 };

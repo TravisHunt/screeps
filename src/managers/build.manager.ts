@@ -74,8 +74,11 @@ export default class BuildManager {
     if (this.schedule.jobs) this.schedule.jobs = this.schedule.jobs.filter(j => !j.complete);
 
     // Spawn builder if we need one
-    if (this.schedule.jobs.length && this.builders.length < this.builderMax && !spawn.spawning) {
-      BuildManager.createBuilder(spawn);
+    if (
+      this.schedule.highPriorityBuild ||
+      (this.schedule.jobs.length && this.builders.length < this.builderMax && !spawn.spawning)
+    ) {
+      BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);
     }
 
     // Spawn repairman if we need one
@@ -132,10 +135,10 @@ export default class BuildManager {
     }
 
     if (creep.memory.building) {
-      // Prioritize build target if I have one
-      if (creep.memory.buildTarget) {
+      // Prioritize high priority build if one exists
+      if (this.schedule.highPriorityBuild) {
         // Get construction site
-        const site = Game.getObjectById(creep.memory.buildTarget);
+        const site = Game.getObjectById(this.schedule.highPriorityBuild);
         if (site && creep.build(site) === ERR_NOT_IN_RANGE) {
           creep.moveTo(site, { visualizePathStyle: { stroke: palette.build } });
           return;
@@ -160,6 +163,18 @@ export default class BuildManager {
         }
       }
     } else {
+      // Are there any containers?
+      const container = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+        filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getUsedCapacity(RESOURCE_ENERGY)
+      });
+      if (container) {
+        if (creep.withdraw(container, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(container, { visualizePathStyle: { stroke: palette.harvest } });
+        }
+        return;
+      }
+
+      // If no containers/storage/etc, harvest from sources
       const sources = creep.room.find(FIND_SOURCES);
       if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
         creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
@@ -178,19 +193,24 @@ export default class BuildManager {
 
     // Build if you're at carrying capacity
     if (!creep.memory.building && creep.store.energy === creep.store.getCapacity()) {
+      // TODO: remove horrible temp fix
+      if (creep.pos.x !== 32) {
+        creep.move(LEFT);
+        return;
+      }
       creep.memory.building = true;
       creep.say("🚧 build");
     }
 
     // Loop action: build site or harvest from energy source
     if (creep.memory.building) {
-      if (creep.memory.buildTarget || creep.memory.jobId) {
+      if (this.schedule.highPriorityBuild || creep.memory.jobId) {
         // Find the first construction site within the job
         let buildSite: ConstructionSite | null = null;
         let job: BuildJob | undefined;
 
-        if (creep.memory.buildTarget) {
-          buildSite = Game.getObjectById(creep.memory.buildTarget);
+        if (this.schedule.highPriorityBuild) {
+          buildSite = Game.getObjectById(this.schedule.highPriorityBuild);
         } else if (creep.memory.jobId) {
           job = this.getJob(creep.memory.jobId);
           if (!job) {
@@ -246,15 +266,13 @@ export default class BuildManager {
     }
   }
 
-  private static createBuilder(spawn: StructureSpawn): void {
+  private static createBuilder(spawn: StructureSpawn, energyCapacity: number): void {
     const name = `Builder${Game.time}`;
     const parts =
-      spawn.store.getCapacity(RESOURCE_ENERGY) >= 550
-        ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]
-        : [WORK, CARRY, MOVE];
+      energyCapacity >= 550 ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE] : [WORK, CARRY, MOVE];
 
-    console.log("Spawning new builder: " + name);
-    spawn.spawnCreep(parts, name, { memory: { role: this.roleBuilder, building: false } });
+    if (spawn.spawnCreep(parts, name, { memory: { role: this.roleBuilder, building: false } }) === OK)
+      console.log("Spawning new builder: " + name);
   }
 
   private static createRepairman(spawn: StructureSpawn): void {

@@ -52,6 +52,6 @@ export default class UpgradeManager {
   public static create(spawn: StructureSpawn): void {
     const name = `Upgrader${Game.time}`;
     console.log("Spawning new upgrader: " + name);
-    spawn.spawnCreep([WORK, CARRY, MOVE], name, { memory: { role: this.role, working: false, upgrading: false } });
+    spawn.spawnCreep([WORK, CARRY, MOVE], name, { memory: { role: this.role, upgrading: false } });
   }
 }

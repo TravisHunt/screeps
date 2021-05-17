@@ -4,9 +4,9 @@ interface Memory {
 
 interface CreepMemory {
   role: string;
-  working?: boolean;
   upgrading?: boolean;
   building?: boolean;
+  harvesting?: boolean;
   jobId?: number;
   buildTarget?: Id<ConstructionSite>;
 }
@@ -34,6 +34,7 @@ interface BuildSchedule {
   jobs: BuildJob[];
   jobCounter: number;
   state: RoomBuildMasterList;
+  highPriorityBuild?: Id<ConstructionSite>;
 }
 
 interface RoomBuildMasterList {

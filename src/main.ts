@@ -1,9 +1,10 @@
 import BuildManager from "managers/build.manager";
+import HarvestManager from "managers/harvest.manager";
 import { ErrorMapper } from "utils/ErrorMapper";
-import { Harvester } from "roles/harvester";
 import UpgradeManager from "managers/upgrade.manager";
 
-const BUILDERS_MAX = 2;
+const HARVESTER_MAX = 2;
+const BUILDER_MAX = 2;
 const REPAIRMAN_MAX = 1;
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
@@ -21,12 +22,6 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
   const spawn1 = Game.spawns.Spawn1;
 
-  // Get harvesters
-  const currentHarvesters = _.filter(Game.creeps, (creep: Creep) => creep.memory.role === Harvester.role);
-  if (currentHarvesters.length < Harvester.max && !spawn1.spawning) {
-    Harvester.create(spawn1);
-  }
-
   // Get upgraders
   const currentUpgraders = _.filter(Game.creeps, (creep: Creep) => creep.memory.role === UpgradeManager.role);
   const upgradeManager = new UpgradeManager(1, currentUpgraders);
@@ -43,17 +38,19 @@ export const loop = ErrorMapper.wrapLoop(() => {
     });
   }
 
+  // Run harvesters
+  const harvestManager = new HarvestManager(spawn1.room, HARVESTER_MAX);
+  harvestManager.run();
+
   // Run builders
-  const buildManager = new BuildManager(spawn1.room, BUILDERS_MAX, REPAIRMAN_MAX);
+  const buildManager = new BuildManager(spawn1.room, BUILDER_MAX, REPAIRMAN_MAX);
   buildManager.run();
 
   // Run creeps
   for (const name in Game.creeps) {
     const creep = Game.creeps[name];
 
-    if (creep.memory.role === "harvester") {
-      Harvester.run(creep);
-    } else if (creep.memory.role === UpgradeManager.role) {
+    if (creep.memory.role === UpgradeManager.role) {
       UpgradeManager.doYourJob(creep);
     }
   }
