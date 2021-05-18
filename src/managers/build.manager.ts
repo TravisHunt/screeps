@@ -75,11 +75,10 @@ export default class BuildManager extends ManagerBase {
     if (this.schedule.jobs) this.schedule.jobs = this.schedule.jobs.filter(j => !j.complete);
 
     // Spawn builder if we need one
-    if (
-      (this.schedule.highPriorityBuild && this.builders.length < this.builderMax && !spawn.spawning) ||
-      (this.schedule.jobs.length && this.builders.length < this.builderMax && !spawn.spawning)
-    ) {
-      BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);
+    if (this.builders.length < this.builderMax && !spawn.spawning) {
+      if (this.schedule.highPriorityBuild || this.schedule.jobs.length) {
+        BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);
+      }
     }
 
     // Spawn repairman if we need one
@@ -205,30 +204,29 @@ export default class BuildManager extends ManagerBase {
 
     // Loop action: build site or harvest from energy source
     if (creep.memory.building) {
-      if (this.schedule.highPriorityBuild || creep.memory.jobId) {
+      if (this.schedule.highPriorityBuild || creep.memory.jobId || creep.memory.buildTarget) {
         // Find the first construction site within the job
         let buildSite: ConstructionSite | null = null;
         let job: BuildJob | undefined;
 
         if (this.schedule.highPriorityBuild) {
           buildSite = Game.getObjectById(this.schedule.highPriorityBuild);
+        } else if (creep.memory.buildTarget) {
+          buildSite = Game.getObjectById(creep.memory.buildTarget);
         } else if (creep.memory.jobId) {
           job = this.getJob(creep.memory.jobId);
-          if (!job) {
-            creep.say("ERR: Job Not Found");
-            return;
-          }
-          for (const pStr of job.pathStrings) {
-            const jobPath = Room.deserializePath(pStr);
-
-            for (const step of jobPath) {
-              const found = this.room.lookForAt(LOOK_CONSTRUCTION_SITES, step.x, step.y);
-              if (found.length) {
-                buildSite = found[0];
-                break;
+          if (job) {
+            for (const pStr of job.pathStrings) {
+              const jobPath = Room.deserializePath(pStr);
+              for (const step of jobPath) {
+                const found = this.room.lookForAt(LOOK_CONSTRUCTION_SITES, step.x, step.y);
+                if (found.length) {
+                  buildSite = found[0];
+                  break;
+                }
               }
+              if (buildSite) break;
             }
-            if (buildSite) break;
           }
         }
 
@@ -243,7 +241,8 @@ export default class BuildManager extends ManagerBase {
               break;
             case ERR_INVALID_TARGET:
               creep.say("ERR: INVALID TARGET");
-              if (creep.memory.buildTarget) delete creep.memory.buildTarget;
+              if (this.schedule.highPriorityBuild) delete this.schedule.highPriorityBuild;
+              else if (creep.memory.buildTarget) delete creep.memory.buildTarget;
               else if (job) job.complete = true;
               break;
             default:
@@ -251,7 +250,8 @@ export default class BuildManager extends ManagerBase {
           }
         } else {
           creep.say("ERR: I HAVE NO SITE");
-          if (creep.memory.buildTarget) delete creep.memory.buildTarget;
+          if (this.schedule.highPriorityBuild) delete this.schedule.highPriorityBuild;
+          else if (creep.memory.buildTarget) delete creep.memory.buildTarget;
           else if (job) job.complete = true;
         }
       } else {
@@ -268,6 +268,7 @@ export default class BuildManager extends ManagerBase {
   }
 
   private static createBuilder(spawn: StructureSpawn, energyCapacity: number): void {
+    console.log("Trying to create builder...");
     const name = `Builder${Game.time}`;
     const parts =
       energyCapacity >= 550 ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE] : [WORK, CARRY, MOVE];

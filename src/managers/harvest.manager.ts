@@ -44,8 +44,8 @@ export default class HarvestManager extends ManagerBase {
 
     if (harvester.memory.harvesting) {
       const sources = harvester.room.find(FIND_SOURCES);
-      if (harvester.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
-        harvester.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
+      if (harvester.harvest(sources[1]) === ERR_NOT_IN_RANGE) {
+        harvester.moveTo(sources[1], { visualizePathStyle: { stroke: palette.harvest } });
       }
     } else {
       // Top up energy stores on structures if needed
