@@ -76,7 +76,7 @@ export default class BuildManager extends ManagerBase {
 
     // Spawn builder if we need one
     if (
-      this.schedule.highPriorityBuild ||
+      (this.schedule.highPriorityBuild && this.builders.length < this.builderMax && !spawn.spawning) ||
       (this.schedule.jobs.length && this.builders.length < this.builderMax && !spawn.spawning)
     ) {
       BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);
