@@ -60,7 +60,7 @@ module.exports = {
     "max-classes-per-file": ["error", 1],
     "new-parens": "off",
     "newline-per-chained-call": "off",
-    "no-bitwise": "error",
+    "no-bitwise": "off",
     "no-caller": "error",
     "no-cond-assign": "error",
     "no-console": "off",
@@ -83,7 +83,7 @@ module.exports = {
     "one-var": ["error", "never"],
     "quote-props": "off",
     radix: "error",
-    "sort-imports": "warn",
+    "sort-imports": "off",
     "spaced-comment": "error",
     "prettier/prettier": "error"
   }

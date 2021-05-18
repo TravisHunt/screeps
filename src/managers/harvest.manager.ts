@@ -1,4 +1,5 @@
 import ManagerBase from "managers/base.manager";
+import ResourceManager from "managers/resource.manager";
 import { palette } from "path.palette";
 
 export default class HarvestManager extends ManagerBase {
@@ -6,11 +7,14 @@ export default class HarvestManager extends ManagerBase {
   public readonly harvesterMax: number;
   public harvesters: Creep[];
   private room: Room;
+  private resourceManager: ResourceManager;
 
-  public constructor(room: Room, harvesterMax: number) {
+  public constructor(room: Room, harvesterMax: number, resourceManager: ResourceManager) {
     super();
     this.room = room;
     this.harvesterMax = harvesterMax;
+    this.resourceManager = resourceManager;
+
     this.harvesters = _.filter(
       Game.creeps,
       (creep: Creep) => creep.memory.role === HarvestManager.roleHarvester && creep.room.name === this.room.name
@@ -43,6 +47,7 @@ export default class HarvestManager extends ManagerBase {
     }
 
     if (harvester.memory.harvesting) {
+      // this.resourceManager.withdraw(harvester, RESOURCE_ENERGY, { ignoreStores: true });
       const sources = harvester.room.find(FIND_SOURCES);
       if (harvester.harvest(sources[1]) === ERR_NOT_IN_RANGE) {
         harvester.moveTo(sources[1], { visualizePathStyle: { stroke: palette.harvest } });

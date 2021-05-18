@@ -1,4 +1,5 @@
 import ManagerBase from "managers/base.manager";
+import ResourceManager from "managers/resource.manager";
 import { palette } from "path.palette";
 
 export default class UpgradeManager extends ManagerBase {
@@ -6,11 +7,14 @@ export default class UpgradeManager extends ManagerBase {
   public readonly room: Room;
   public readonly creepMax: number;
   public creeps: Creep[];
+  private resourceManager: ResourceManager;
 
-  public constructor(room: Room, max: number) {
+  public constructor(room: Room, max: number, resourceManager: ResourceManager) {
     super();
     this.room = room;
     this.creepMax = max;
+    this.resourceManager = resourceManager;
+
     this.creeps = _.filter(
       Game.creeps,
       (creep: Creep) => creep.memory.role === UpgradeManager.role && creep.room.name === this.room.name
@@ -27,11 +31,11 @@ export default class UpgradeManager extends ManagerBase {
     }
 
     for (const creep of this.creeps) {
-      UpgradeManager.doYourJob(creep);
+      this.doYourJob(creep);
     }
   }
 
-  public static doYourJob(creep: Creep): void {
+  public doYourJob(creep: Creep): void {
     // TODO: make sure the creep is capable of this job
 
     // Harvest if you have no more energy
@@ -56,10 +60,12 @@ export default class UpgradeManager extends ManagerBase {
         creep.say("ERROR: No ctrl");
       }
     } else {
-      const sources = creep.room.find(FIND_SOURCES);
-      if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
-        creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
-      }
+      const res = this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      console.log(`Upgrader withdraw res: ${res}`);
+      // const sources = creep.room.find(FIND_SOURCES);
+      // if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
+      //   creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
+      // }
     }
   }
 

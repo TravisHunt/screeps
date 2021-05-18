@@ -1,6 +1,7 @@
+import { ErrorMapper } from "utils/ErrorMapper";
 import BuildManager from "managers/build.manager";
 import HarvestManager from "managers/harvest.manager";
-import { ErrorMapper } from "utils/ErrorMapper";
+import ResourceManager from "managers/resource.manager";
 import UpgradeManager from "managers/upgrade.manager";
 
 const HARVESTER_MAX = 2;
@@ -18,10 +19,13 @@ export const loop = ErrorMapper.wrapLoop(() => {
     }
   }
 
-  // Init build schedules table
+  // Init memory tables for various processes
   if (!Memory.buildSchedules) Memory.buildSchedules = {};
+  if (!Memory.resources) Memory.resources = {};
 
   const spawn1 = Game.spawns.Spawn1;
+
+  const resourceManager = new ResourceManager(spawn1.room);
 
   // Visualize spawning
   if (spawn1.spawning) {
@@ -33,11 +37,14 @@ export const loop = ErrorMapper.wrapLoop(() => {
   }
 
   // Build and start managers for this room
-  const harvestManager = new HarvestManager(spawn1.room, HARVESTER_MAX);
+  const harvestManager = new HarvestManager(spawn1.room, HARVESTER_MAX, resourceManager);
   const buildManager = new BuildManager(spawn1.room, BUILDER_MAX, REPAIRMAN_MAX);
-  const upgradeManager = new UpgradeManager(spawn1.room, UPGRADER_MAX);
+  const upgradeManager = new UpgradeManager(spawn1.room, UPGRADER_MAX, resourceManager);
 
   harvestManager.run();
   buildManager.run();
   upgradeManager.run();
+
+  // Manage resource access
+  resourceManager.run();
 });
