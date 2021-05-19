@@ -1,7 +1,7 @@
 import { ErrorMapper } from "utils/ErrorMapper";
 import BuildManager from "managers/build.manager";
 import HarvestManager from "managers/harvest.manager";
-import ResourceManager from "managers/resource.manager";
+import ResourceManager from "managers/resource/resource.manager";
 import UpgradeManager from "managers/upgrade.manager";
 
 const HARVESTER_MAX = 2;

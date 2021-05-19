@@ -258,6 +258,7 @@ export default class BuildManager extends ManagerBase {
         // No job? Pick up an unassigned construction sites
         const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
         if (site) creep.memory.buildTarget = site.id;
+        else this.repair(creep);
       }
     } else {
       const sources = creep.room.find(FIND_SOURCES);

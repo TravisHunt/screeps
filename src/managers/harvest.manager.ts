@@ -1,5 +1,5 @@
 import ManagerBase from "managers/base.manager";
-import ResourceManager from "managers/resource.manager";
+import ResourceManager from "managers/resource/resource.manager";
 import { palette } from "path.palette";
 
 export default class HarvestManager extends ManagerBase {

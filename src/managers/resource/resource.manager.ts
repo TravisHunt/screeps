@@ -1,4 +1,5 @@
 import * as constants from "screeps.constants";
+import * as utils from "./utils";
 import ManagerBase from "managers/base.manager";
 import { palette } from "path.palette";
 
@@ -54,16 +55,16 @@ export default class ResourceManager extends ManagerBase {
    * @param opts Optional values for withdraw request
    * @returns A code indicating the status of the withdraw request
    */
-  public withdraw<R extends ResourceConstant>(creep: Creep, type: R, opts?: WithdrawOpts): ResourceManagerReturnCode {
+  public withdraw<R extends ResourceConstant>(creep: Creep, type: R, opts?: WithdrawOpts): utils.ResourceReturnCode {
     switch (type) {
       case RESOURCE_ENERGY:
         return this.withdrawEnergy(creep, opts);
       default:
-        return RM_ERR_RESOURCE_NOT_IMPLEMENTED;
+        return utils.ERR_RESOURCE_NOT_IMPLEMENTED;
     }
   }
 
-  private withdrawEnergy(creep: Creep, opts?: WithdrawOpts): ResourceManagerReturnCode {
+  private withdrawEnergy(creep: Creep, opts?: WithdrawOpts): utils.ResourceReturnCode {
     const usingStore = !opts || !opts.ignoreStores;
     const amount = opts && opts.amount && opts.amount > 0 ? opts.amount : creep.store.getFreeCapacity();
 
@@ -79,7 +80,7 @@ export default class ResourceManager extends ManagerBase {
     // check if this creep is already waiting in the source queue
     // if not, enter creep into source queue.
 
-    return RM_ERR_RESOURCE_NOT_IMPLEMENTED;
+    return utils.ERR_RESOURCE_NOT_IMPLEMENTED;
   }
 
   private static creepWithdrawFrom<R extends ResourceConstant>(
@@ -87,15 +88,15 @@ export default class ResourceManager extends ManagerBase {
     type: R,
     target: Structure<StructureConstant>,
     amount?: number
-  ): ResourceManagerReturnCode {
-    // let retCode: ResourceManagerReturnCode = RM_OK;
+  ): utils.ResourceReturnCode {
+    let retCode: utils.ResourceReturnCode = utils.OK;
 
     if (creep.withdraw(target, type, amount) === ERR_NOT_IN_RANGE) {
       creep.moveTo(target, { visualizePathStyle: { stroke: palette.harvest } });
-      // retCode = RM_MOVING_TO_TARGET;
+      retCode = utils.MOVING_TO_TARGET;
     }
 
-    return 0;
+    return retCode;
   }
 
   /**

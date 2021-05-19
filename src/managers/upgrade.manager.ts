@@ -1,5 +1,5 @@
 import ManagerBase from "managers/base.manager";
-import ResourceManager from "managers/resource.manager";
+import ResourceManager from "managers/resource/resource.manager";
 import { palette } from "path.palette";
 
 export default class UpgradeManager extends ManagerBase {
@@ -60,12 +60,7 @@ export default class UpgradeManager extends ManagerBase {
         creep.say("ERROR: No ctrl");
       }
     } else {
-      const res = this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
-      console.log(`Upgrader withdraw res: ${res}`);
-      // const sources = creep.room.find(FIND_SOURCES);
-      // if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
-      //   creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
-      // }
+      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
     }
   }
 

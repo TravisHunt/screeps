@@ -1,37 +1,3 @@
-declare const RM_OK: RM_OK;
-declare const RM_MOVING_TO_TARGET: RM_MOVING_TO_TARGET;
-declare const RM_ERR_NOT_ENOUGH_ENERGY: RM_ERR_NOT_ENOUGH_ENERGY;
-declare const RM_ERR_RESOURCE_NOT_IMPLEMENTED: RM_ERR_RESOURCE_NOT_IMPLEMENTED;
-
-type ResourceManagerReturnCode = OK | RM_MOVING_TO_TARGET | RM_ERR_NOT_ENOUGH_ENERGY | RM_ERR_RESOURCE_NOT_IMPLEMENTED;
-
-type RM_OK = 0;
-type RM_MOVING_TO_TARGET = 1;
-type RM_ERR_NOT_ENOUGH_ENERGY = -1;
-type RM_ERR_RESOURCE_NOT_IMPLEMENTED = -2;
-
-interface WithdrawOpts {
-  amount?: number;
-  ignoreStores?: boolean;
-}
-
-interface ManagedResource {
-  sourceId: Id<Source>;
-  harvestPositions: OccupiablePosition[];
-}
-
-interface OccupiablePosition {
-  x: number;
-  y: number;
-  occuiped: boolean;
-}
-
-interface ResourceManagerMemory {
-  sources: ManagedResource[];
-  containers: Id<StructureContainer>[];
-  storageUnits: Id<StructureStorage>[];
-}
-
 interface Memory {
   buildSchedules: Record<string, BuildSchedule>;
   resources: Record<string, ResourceManagerMemory>;
