@@ -1,5 +1,6 @@
 import ManagerBase from "managers/base.manager";
-import { palette } from "path.palette";
+import ResourceManager from "managers/resource/resource.manager";
+import * as palette from "palette";
 
 export default class BuildManager extends ManagerBase {
   public static readonly roleBuilder = "builder";
@@ -9,12 +10,15 @@ export default class BuildManager extends ManagerBase {
   public builders: Creep[];
   public repairmen: Creep[];
   private room: Room;
+  private resourceManager: ResourceManager;
 
-  public constructor(room: Room, builderMax: number, repairmanMax: number) {
+  public constructor(room: Room, builderMax: number, repairmanMax: number, resourceManager: ResourceManager) {
     super();
     this.room = room;
     this.builderMax = builderMax;
     this.repairmanMax = repairmanMax;
+    this.resourceManager = resourceManager;
+
     this.builders = _.filter(
       Game.creeps,
       (creep: Creep) => creep.memory.role === BuildManager.roleBuilder && creep.room.name === this.room.name
@@ -123,61 +127,47 @@ export default class BuildManager extends ManagerBase {
 
   private repair(creep: Creep): void {
     // Harvest if you have no more energy
-    if (creep.memory.building && creep.store.getUsedCapacity() === 0) {
-      creep.memory.building = false;
+    if (!creep.memory.harvesting && creep.store.getUsedCapacity() === 0) {
+      creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
 
-    // Build if you're at carrying capacity
-    if (!creep.memory.building && creep.store.energy === creep.store.getCapacity()) {
-      creep.memory.building = true;
+    // Repair if you're at carrying capacity
+    if (creep.memory.harvesting && creep.store.energy === creep.store.getCapacity()) {
+      creep.memory.harvesting = false;
       creep.say("🚧 repair");
     }
 
-    if (creep.memory.building) {
-      // Prioritize high priority build if one exists
-      if (this.schedule.highPriorityBuild) {
-        // Get construction site
-        const site = Game.getObjectById(this.schedule.highPriorityBuild);
-        if (site && creep.build(site) === ERR_NOT_IN_RANGE) {
-          creep.moveTo(site, { visualizePathStyle: { stroke: palette.build } });
-          return;
-        }
-      }
+    if (creep.memory.harvesting) {
+      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      return;
+    }
 
-      const repairTargets = creep.room.find(FIND_STRUCTURES, {
-        filter: object => object.hits < object.hitsMax
-      });
-
-      repairTargets.sort((a, b) => a.hits - b.hits);
-
-      if (repairTargets.length > 0) {
-        if (creep.repair(repairTargets[0]) === ERR_NOT_IN_RANGE) {
-          creep.moveTo(repairTargets[0], { visualizePathStyle: { stroke: palette.repair } });
-        }
-      } else {
-        // If there's nothing to repair, see if there are any construction sites nearby
-        const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
-        if (site && creep.build(site) === ERR_NOT_IN_RANGE) {
-          creep.moveTo(site, { visualizePathStyle: { stroke: palette.build } });
-        }
-      }
-    } else {
-      // Are there any containers?
-      const container = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-        filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getUsedCapacity(RESOURCE_ENERGY)
-      });
-      if (container) {
-        if (creep.withdraw(container, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-          creep.moveTo(container, { visualizePathStyle: { stroke: palette.harvest } });
-        }
+    // Prioritize high priority build if one exists
+    if (this.schedule.highPriorityBuild) {
+      // Get construction site
+      const site = Game.getObjectById(this.schedule.highPriorityBuild);
+      if (site && creep.build(site) === ERR_NOT_IN_RANGE) {
+        creep.moveTo(site, { visualizePathStyle: { stroke: palette.PATH_COLOR_BUILD } });
         return;
       }
+    }
 
-      // If no containers/storage/etc, harvest from sources
-      const sources = creep.room.find(FIND_SOURCES);
-      if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
-        creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
+    const repairTargets = creep.room.find(FIND_STRUCTURES, {
+      filter: object => object.hits < object.hitsMax
+    });
+
+    repairTargets.sort((a, b) => a.hits - b.hits);
+
+    if (repairTargets.length > 0) {
+      if (creep.repair(repairTargets[0]) === ERR_NOT_IN_RANGE) {
+        creep.moveTo(repairTargets[0], { visualizePathStyle: { stroke: palette.PATH_COLOR_REPAIR } });
+      }
+    } else {
+      // If there's nothing to repair, see if there are any construction sites nearby
+      const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
+      if (site && creep.build(site) === ERR_NOT_IN_RANGE) {
+        creep.moveTo(site, { visualizePathStyle: { stroke: palette.PATH_COLOR_BUILD } });
       }
     }
   }
@@ -186,85 +176,78 @@ export default class BuildManager extends ManagerBase {
     // TODO: make sure the creep is capable of this job
 
     // Harvest if you have no more energy
-    if (creep.memory.building && creep.store.getUsedCapacity() === 0) {
-      creep.memory.building = false;
+    if (!creep.memory.harvesting && creep.store.getUsedCapacity() === 0) {
+      creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
 
     // Build if you're at carrying capacity
-    if (!creep.memory.building && creep.store.energy === creep.store.getCapacity()) {
-      // TODO: remove horrible temp fix
-      if (creep.pos.x !== 32) {
-        creep.move(LEFT);
-        return;
-      }
-      creep.memory.building = true;
+    if (creep.memory.harvesting && creep.store.energy === creep.store.getCapacity()) {
+      creep.memory.harvesting = false;
       creep.say("🚧 build");
     }
 
     // Loop action: build site or harvest from energy source
-    if (creep.memory.building) {
-      if (this.schedule.highPriorityBuild || creep.memory.jobId || creep.memory.buildTarget) {
-        // Find the first construction site within the job
-        let buildSite: ConstructionSite | null = null;
-        let job: BuildJob | undefined;
+    if (creep.memory.harvesting) {
+      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      return;
+    }
 
-        if (this.schedule.highPriorityBuild) {
-          buildSite = Game.getObjectById(this.schedule.highPriorityBuild);
-        } else if (creep.memory.buildTarget) {
-          buildSite = Game.getObjectById(creep.memory.buildTarget);
-        } else if (creep.memory.jobId) {
-          job = this.getJob(creep.memory.jobId);
-          if (job) {
-            for (const pStr of job.pathStrings) {
-              const jobPath = Room.deserializePath(pStr);
-              for (const step of jobPath) {
-                const found = this.room.lookForAt(LOOK_CONSTRUCTION_SITES, step.x, step.y);
-                if (found.length) {
-                  buildSite = found[0];
-                  break;
-                }
+    if (this.schedule.highPriorityBuild || creep.memory.jobId || creep.memory.buildTarget) {
+      // Find the first construction site within the job
+      let buildSite: ConstructionSite | null = null;
+      let job: BuildJob | undefined;
+
+      if (this.schedule.highPriorityBuild) {
+        buildSite = Game.getObjectById(this.schedule.highPriorityBuild);
+      } else if (creep.memory.buildTarget) {
+        buildSite = Game.getObjectById(creep.memory.buildTarget);
+      } else if (creep.memory.jobId) {
+        job = this.getJob(creep.memory.jobId);
+        if (job) {
+          for (const pStr of job.pathStrings) {
+            const jobPath = Room.deserializePath(pStr);
+            for (const step of jobPath) {
+              const found = this.room.lookForAt(LOOK_CONSTRUCTION_SITES, step.x, step.y);
+              if (found.length) {
+                buildSite = found[0];
+                break;
               }
-              if (buildSite) break;
             }
+            if (buildSite) break;
           }
         }
+      }
 
-        if (buildSite) {
-          const buildResponse = creep.build(buildSite);
-          switch (creep.build(buildSite)) {
-            case OK:
-              creep.say("🚧 build");
-              break;
-            case ERR_NOT_IN_RANGE:
-              creep.moveTo(buildSite, { visualizePathStyle: { stroke: palette.build } });
-              break;
-            case ERR_INVALID_TARGET:
-              creep.say("ERR: INVALID TARGET");
-              if (this.schedule.highPriorityBuild) delete this.schedule.highPriorityBuild;
-              else if (creep.memory.buildTarget) delete creep.memory.buildTarget;
-              else if (job) job.complete = true;
-              break;
-            default:
-              creep.say(`ERR: ${buildResponse}`);
-          }
-        } else {
-          creep.say("ERR: I HAVE NO SITE");
-          if (this.schedule.highPriorityBuild) delete this.schedule.highPriorityBuild;
-          else if (creep.memory.buildTarget) delete creep.memory.buildTarget;
-          else if (job) job.complete = true;
+      if (buildSite) {
+        const buildResponse = creep.build(buildSite);
+        switch (creep.build(buildSite)) {
+          case OK:
+            creep.say("🚧 build");
+            break;
+          case ERR_NOT_IN_RANGE:
+            creep.moveTo(buildSite, { visualizePathStyle: { stroke: palette.PATH_COLOR_BUILD } });
+            break;
+          case ERR_INVALID_TARGET:
+            creep.say("ERR: INVALID TARGET");
+            if (this.schedule.highPriorityBuild) delete this.schedule.highPriorityBuild;
+            else if (creep.memory.buildTarget) delete creep.memory.buildTarget;
+            else if (job) job.complete = true;
+            break;
+          default:
+            creep.say(`ERR: ${buildResponse}`);
         }
       } else {
-        // No job? Pick up an unassigned construction sites
-        const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
-        if (site) creep.memory.buildTarget = site.id;
-        else this.repair(creep);
+        creep.say("ERR: I HAVE NO SITE");
+        if (this.schedule.highPriorityBuild) delete this.schedule.highPriorityBuild;
+        else if (creep.memory.buildTarget) delete creep.memory.buildTarget;
+        else if (job) job.complete = true;
       }
     } else {
-      const sources = creep.room.find(FIND_SOURCES);
-      if (creep.harvest(sources[0]) === ERR_NOT_IN_RANGE) {
-        creep.moveTo(sources[0], { visualizePathStyle: { stroke: palette.harvest } });
-      }
+      // No job? Pick up an unassigned construction sites
+      const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
+      if (site) creep.memory.buildTarget = site.id;
+      else this.repair(creep);
     }
   }
 

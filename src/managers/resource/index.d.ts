@@ -11,11 +11,20 @@ interface ManagedResource {
 interface OccupiablePosition {
   x: number;
   y: number;
-  occuiped: boolean;
+  occuiped?: HarvestJob;
+}
+
+interface HarvestJob {
+  creepId: Id<Creep>;
+  requested: number;
+  start: number;
+  progress: number;
+  path: string;
 }
 
 interface ResourceManagerMemory {
   sources: ManagedResource[];
   containers: Id<StructureContainer>[];
   storageUnits: Id<StructureStorage>[];
+  harvestQueue: [Id<Creep>, number][];
 }

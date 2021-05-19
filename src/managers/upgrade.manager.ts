@@ -1,6 +1,6 @@
 import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
-import { palette } from "path.palette";
+import * as palette from "palette";
 
 export default class UpgradeManager extends ManagerBase {
   public static readonly role = "upgrader";
@@ -27,7 +27,7 @@ export default class UpgradeManager extends ManagerBase {
 
     // create upgraders if we don't have enough
     if (this.creeps.length < this.creepMax && !spawn.spawning) {
-      UpgradeManager.create(spawn);
+      UpgradeManager.create(spawn, this.room.energyCapacityAvailable);
     }
 
     for (const creep of this.creeps) {
@@ -39,34 +39,36 @@ export default class UpgradeManager extends ManagerBase {
     // TODO: make sure the creep is capable of this job
 
     // Harvest if you have no more energy
-    if (creep.memory.upgrading && creep.store.getUsedCapacity() === 0) {
-      creep.memory.upgrading = false;
+    if (!creep.memory.harvesting && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+      creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
 
     // Upgrade if you're at carrying capacity
-    if (!creep.memory.upgrading && creep.store.energy === creep.store.getCapacity()) {
-      creep.memory.upgrading = true;
+    if (creep.memory.harvesting && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+      creep.memory.harvesting = false;
       creep.say("⚡ upgrade");
     }
 
     // Loop action: upgrade controller or harvest from energy source
-    if (creep.memory.upgrading) {
-      if (creep.room.controller) {
-        if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-          creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: palette.upgrade } });
-        }
-      } else {
-        creep.say("ERROR: No ctrl");
+    if (creep.memory.harvesting) {
+      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      return;
+    }
+
+    if (creep.room.controller) {
+      if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
+        creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE } });
       }
     } else {
-      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      creep.say("ERROR: No ctrl");
     }
   }
 
-  public static create(spawn: StructureSpawn): void {
+  public static create(spawn: StructureSpawn, energyCapacity: number): void {
     const name = `Upgrader${Game.time}`;
-    const parts = [WORK, CARRY, MOVE];
+    const parts =
+      energyCapacity >= 550 ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE] : [WORK, CARRY, MOVE];
     const opts = { memory: { role: this.role, upgrading: false } };
     if (spawn.spawnCreep(parts, name, opts) === OK) console.log("Spawning new upgrader: " + name);
   }

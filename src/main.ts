@@ -38,7 +38,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
   // Build and start managers for this room
   const harvestManager = new HarvestManager(spawn1.room, HARVESTER_MAX, resourceManager);
-  const buildManager = new BuildManager(spawn1.room, BUILDER_MAX, REPAIRMAN_MAX);
+  const buildManager = new BuildManager(spawn1.room, BUILDER_MAX, REPAIRMAN_MAX, resourceManager);
   const upgradeManager = new UpgradeManager(spawn1.room, UPGRADER_MAX, resourceManager);
 
   harvestManager.run();

@@ -1,6 +1,6 @@
 import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
-import { palette } from "path.palette";
+import * as palette from "palette";
 
 export default class HarvestManager extends ManagerBase {
   public static readonly roleHarvester = "harvester";
@@ -47,47 +47,44 @@ export default class HarvestManager extends ManagerBase {
     }
 
     if (harvester.memory.harvesting) {
-      // this.resourceManager.withdraw(harvester, RESOURCE_ENERGY, { ignoreStores: true });
-      const sources = harvester.room.find(FIND_SOURCES);
-      if (harvester.harvest(sources[1]) === ERR_NOT_IN_RANGE) {
-        harvester.moveTo(sources[1], { visualizePathStyle: { stroke: palette.harvest } });
+      this.resourceManager.withdraw(harvester, RESOURCE_ENERGY, { ignoreStores: true });
+      return;
+    }
+
+    // Top up energy stores on structures if needed
+    let structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
+      filter: s => {
+        return (
+          (s.structureType === STRUCTURE_SPAWN ||
+            s.structureType === STRUCTURE_EXTENSION ||
+            s.structureType === STRUCTURE_TOWER) &&
+          s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+        );
+      }
+    });
+
+    // If spawns, extension, and towers are good, default to containers
+    if (!structure) {
+      structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
+        filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getFreeCapacity(RESOURCE_ENERGY)
+      });
+    }
+
+    if (structure) {
+      // Deposit energy into structure
+      if (harvester.transfer(structure, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+        harvester.moveTo(structure, { visualizePathStyle: { stroke: palette.PATH_COLOR_TRANSFER } });
       }
     } else {
-      // Top up energy stores on structures if needed
-      let structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
-        filter: s => {
-          return (
-            (s.structureType === STRUCTURE_SPAWN ||
-              s.structureType === STRUCTURE_EXTENSION ||
-              s.structureType === STRUCTURE_TOWER) &&
-            s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-          );
+      // No where to store energy. Do we have a high priority build target?
+      if (this.schedule.highPriorityBuild) {
+        const target = Game.getObjectById(this.schedule.highPriorityBuild);
+        if (target && harvester.build(target) === ERR_NOT_IN_RANGE) {
+          harvester.moveTo(target, { visualizePathStyle: { stroke: palette.PATH_COLOR_BUILD } });
         }
-      });
-
-      // If spawns, extension, and towers are good, default to containers
-      if (!structure) {
-        structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
-          filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getFreeCapacity(RESOURCE_ENERGY)
-        });
-      }
-
-      if (structure) {
-        // Deposit energy into structure
-        if (harvester.transfer(structure, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-          harvester.moveTo(structure, { visualizePathStyle: { stroke: palette.transfer } });
-        }
-      } else {
-        // No where to store energy. Do we have a high priority build target?
-        if (this.schedule.highPriorityBuild) {
-          const target = Game.getObjectById(this.schedule.highPriorityBuild);
-          if (target && harvester.build(target) === ERR_NOT_IN_RANGE) {
-            harvester.moveTo(target, { visualizePathStyle: { stroke: palette.build } });
-          }
-        } else if (harvester.room.controller) {
-          if (harvester.upgradeController(harvester.room.controller) === ERR_NOT_IN_RANGE) {
-            harvester.moveTo(harvester.room.controller, { visualizePathStyle: { stroke: palette.upgrade } });
-          }
+      } else if (harvester.room.controller) {
+        if (harvester.upgradeController(harvester.room.controller) === ERR_NOT_IN_RANGE) {
+          harvester.moveTo(harvester.room.controller, { visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE } });
         }
       }
     }

@@ -1,13 +1,15 @@
 import * as constants from "screeps.constants";
 import * as utils from "./utils";
 import ManagerBase from "managers/base.manager";
-import { palette } from "path.palette";
+import HarvestQueue from "./HarvestQueue";
+import * as palette from "palette";
 
 export default class ResourceManager extends ManagerBase {
   private room: Room;
   private sources: Source[];
   private containers: StructureContainer[] = [];
   private storageUnits: StructureStorage[] = [];
+  private harvestQueue: HarvestQueue;
 
   public constructor(room: Room) {
     super();
@@ -18,6 +20,7 @@ export default class ResourceManager extends ManagerBase {
     this.sources = this.memory.sources.map(s => Game.getObjectById(s.sourceId) as Source);
     this.containers = this.memory.containers.map(id => Game.getObjectById(id) as StructureContainer);
     this.storageUnits = this.memory.storageUnits.map(id => Game.getObjectById(id) as StructureStorage);
+    this.harvestQueue = new HarvestQueue(this.memory.harvestQueue || []);
   }
 
   /**
@@ -34,13 +37,117 @@ export default class ResourceManager extends ManagerBase {
     Memory.resources[this.room.name] = memory;
   }
 
+  private get firstAvailableHarvestPosition(): OccupiablePosition | undefined {
+    for (const managed of this.memory.sources) {
+      for (const position of managed.harvestPositions) {
+        if (!position.occuiped) return position;
+      }
+    }
+
+    return undefined;
+  }
+
   public run(): void {
+    // Run harvest jobs for creeps occupying harvest positions
+    // Clear occupied spaces where the occupier is done harvesting
+    for (const managedSource of this.memory.sources) {
+      const source = this.sources.find(s => s.id === managedSource.sourceId);
+      if (!source) throw new Error(`Missing source: ${managedSource.sourceId}`);
+
+      for (const slot of managedSource.harvestPositions) {
+        if (slot.occuiped) {
+          const creep = Game.getObjectById(slot.occuiped.creepId);
+
+          // If Game doesn't give us a creep, assume it's dead and clear
+          // the harvest position.
+          if (!creep) {
+            slot.occuiped = undefined;
+            continue;
+          }
+
+          // Check harvest job progress. If we're done, clear out the slot
+          // so it can be reassigned.
+          slot.occuiped.progress = creep.store.getUsedCapacity(RESOURCE_ENERGY) - slot.occuiped.start;
+          if (slot.occuiped.progress >= slot.occuiped.requested) {
+            // Harvest job is done. Clear out position.
+            slot.occuiped = undefined;
+          } else {
+            // Has the creep made it to their assigned harvest position?
+            if (creep.pos.isEqualTo(slot.x, slot.y)) {
+              // Continue harvesting for this tick
+              creep.harvest(source);
+            } else {
+              // Move to the harvest position using the serialized path string
+              // generated when the harvest position was assigned.
+              creep.moveByPath(slot.occuiped.path);
+            }
+          }
+        }
+      }
+    }
+
+    // Assign unoccupied harvest positions to creeps waiting in the queue
+    if (this.harvestQueue.length) {
+      // Get the number of unoccupied harvest positions
+      const unoccupied = this.memory.sources
+        .map(s => s.harvestPositions)
+        .reduce((acc, val) => acc.concat(val), [])
+        .filter(pos => !pos.occuiped).length;
+
+      // The number of assignments is equal to either the number of unoccupied
+      // spaces or the number of creeps in the queue, whichever is smallest.
+      const assignmentsOrdered = Math.min(this.harvestQueue.length, unoccupied);
+      let assignmentsComplete = 0;
+
+      // For each unoccupied position, dequeue the first creep in line and
+      // assign them to an unoccupied harvest position.
+      while (assignmentsComplete < assignmentsOrdered) {
+        const harvestRequest = this.harvestQueue.dequeue();
+        if (!harvestRequest) throw new Error("Harvest Queue was empty when assigning positions");
+
+        const creep = Game.getObjectById(harvestRequest[0]);
+
+        // If the creep died waiting in the queue, we increment the action
+        // counter and continue to ensure that we don't pull more from the
+        // queue then we want to.
+        if (!creep) {
+          assignmentsComplete++;
+          continue;
+        }
+
+        // Assign the creep to the first available harvest position
+        if (this.firstAvailableHarvestPosition) {
+          const pos = new RoomPosition(
+            this.firstAvailableHarvestPosition.x,
+            this.firstAvailableHarvestPosition.y,
+            this.room.name
+          );
+          this.firstAvailableHarvestPosition.occuiped = {
+            creepId: harvestRequest[0],
+            requested: harvestRequest[1],
+            start: creep.store.getUsedCapacity(RESOURCE_ENERGY),
+            progress: 0,
+            path: Room.serializePath(creep.pos.findPathTo(pos))
+          };
+
+          assignmentsComplete++;
+        } else {
+          throw new Error("No available harvest positions when one was expected");
+        }
+      }
+    }
+
+    // TODO: perform any necessary end-of-tick clean up
+    // Save updated harvest queue to memory
+    this.memory.harvestQueue = this.harvestQueue.queue;
+
     // Highlight occupiable resource positions while in debug mode
     if (constants.debug) {
       const visual = new RoomVisual(this.room.name);
       const positions = this.memory.sources.map(s => s.harvestPositions).reduce((acc, val) => acc.concat(val), []);
       for (const pos of positions) {
-        visual.circle(pos.x, pos.y, { fill: "white", radius: 0.5 });
+        const color = pos.occuiped ? palette.HARVEST_POS_OCCUPIED : palette.HARVEST_POS;
+        visual.circle(pos.x, pos.y, { fill: color, radius: 0.5 });
       }
     }
   }
@@ -66,7 +173,11 @@ export default class ResourceManager extends ManagerBase {
 
   private withdrawEnergy(creep: Creep, opts?: WithdrawOpts): utils.ResourceReturnCode {
     const usingStore = !opts || !opts.ignoreStores;
-    const amount = opts && opts.amount && opts.amount > 0 ? opts.amount : creep.store.getFreeCapacity();
+    const amount = opts && opts.amount && opts.amount > 0 ? opts.amount : creep.store.getFreeCapacity(RESOURCE_ENERGY);
+
+    if (constants.debug) {
+      console.log(`Creep: ${creep.id}, usingStore: ${usingStore ? "YES" : "NO"}, amount: ${amount}`);
+    }
 
     if (usingStore) {
       // find first available storage unit or container with energy
@@ -77,10 +188,14 @@ export default class ResourceManager extends ManagerBase {
       if (viableContainer) return ResourceManager.creepWithdrawFrom(creep, RESOURCE_ENERGY, viableContainer, amount);
     }
 
-    // check if this creep is already waiting in the source queue
+    // Check if this creep is already harvesting or waiting in the source queue
     // if not, enter creep into source queue.
+    if (!this.isCreepHarvesting(creep.id) && !this.harvestQueue.containsCreep(creep.id)) {
+      const count = this.harvestQueue.enqueue([creep.id, amount]);
+      if (constants.debug) console.log(`Queue length: ${count}`);
+    }
 
-    return utils.ERR_RESOURCE_NOT_IMPLEMENTED;
+    return utils.CREEP_IN_HARVEST_QUEUE;
   }
 
   private static creepWithdrawFrom<R extends ResourceConstant>(
@@ -92,11 +207,26 @@ export default class ResourceManager extends ManagerBase {
     let retCode: utils.ResourceReturnCode = utils.OK;
 
     if (creep.withdraw(target, type, amount) === ERR_NOT_IN_RANGE) {
-      creep.moveTo(target, { visualizePathStyle: { stroke: palette.harvest } });
+      creep.moveTo(target, { visualizePathStyle: { stroke: palette.PATH_COLOR_HARVEST } });
       retCode = utils.MOVING_TO_TARGET;
     }
 
     return retCode;
+  }
+
+  private isCreepHarvesting(creepId: Id<Creep>): boolean {
+    let harvesting = false;
+
+    for (const source of this.memory.sources) {
+      for (const pos of source.harvestPositions) {
+        if (pos.occuiped && pos.occuiped.creepId === creepId) {
+          harvesting = true;
+          break;
+        }
+      }
+    }
+
+    return harvesting;
   }
 
   /**
@@ -129,7 +259,8 @@ export default class ResourceManager extends ManagerBase {
       this.memory = {
         sources: managedResources,
         containers: containers.map(c => c.id),
-        storageUnits: storageUnits.map(s => s.id)
+        storageUnits: storageUnits.map(s => s.id),
+        harvestQueue: []
       };
     }
   }
@@ -155,7 +286,7 @@ export default class ResourceManager extends ManagerBase {
         const road = pos.lookFor(LOOK_STRUCTURES).filter(s => s.structureType === STRUCTURE_ROAD).length;
         const validPos = road || ((code & TERRAIN_MASK_WALL) === 0 && (code & TERRAIN_MASK_LAVA) === 0);
 
-        if (validPos) positions.push({ x, y, occuiped: false });
+        if (validPos) positions.push({ x, y });
       }
     }
 
