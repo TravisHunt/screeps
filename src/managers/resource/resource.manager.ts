@@ -1,6 +1,7 @@
 import * as constants from "screeps.constants";
 import * as utils from "./utils";
 import ManagerBase from "managers/base.manager";
+import ManagedSource from "./ManagedSource";
 import HarvestQueue from "./HarvestQueue";
 import * as palette from "palette";
 import {
@@ -12,7 +13,8 @@ import {
 
 export default class ResourceManager extends ManagerBase {
   private room: Room;
-  private sources: Source[];
+  // private sources: Source[];
+  private managedSources: ManagedSource[] = [];
   private containers: StructureContainer[] = [];
   private storageUnits: StructureStorage[] = [];
   private harvestQueue: HarvestQueue;
@@ -23,9 +25,11 @@ export default class ResourceManager extends ManagerBase {
 
     this.init();
 
-    this.sources = this.memory.sources.map(
-      s => Game.getObjectById(s.sourceId) as Source
-    );
+    this.managedSources = this.memory.sources.map(s => new ManagedSource(s));
+
+    // this.sources = this.memory.sources.map(
+    //   s => Game.getObjectById(s.sourceId) as Source
+    // );
     this.containers = this.memory.containers.map(
       id => Game.getObjectById(id) as StructureContainer
     );
@@ -49,65 +53,27 @@ export default class ResourceManager extends ManagerBase {
     Memory.resources[this.room.name] = memory;
   }
 
-  private get firstAvailableHarvestPosition(): OccupiablePosition | undefined {
-    for (const managed of this.memory.sources) {
-      for (const position of managed.harvestPositions) {
-        if (!position.occuiped) return position;
-      }
+  private getAvailableHarvestPosition(): OccupiablePosition | undefined {
+    for (const managed of this.managedSources) {
+      const pos = managed.getAvailablePosition();
+      if (pos) return pos;
     }
 
     return undefined;
   }
 
   public run(): void {
-    // Run harvest jobs for creeps occupying harvest positions
-    // Clear occupied spaces where the occupier is done harvesting
-    for (const managedSource of this.memory.sources) {
-      const source = this.sources.find(s => s.id === managedSource.sourceId);
-      if (!source) throw new Error(`Missing source: ${managedSource.sourceId}`);
+    // Run harvest jobs for creeps occupying harvest positions.
+    // Clear occupied spaces where the occupier is done harvesting.
+    for (const source of this.managedSources) {
+      const insight = source.run();
 
-      for (const slot of managedSource.harvestPositions) {
-        if (slot.occuiped) {
-          const creep = Game.getObjectById(slot.occuiped.creepId);
-
-          // If Game doesn't give us a creep, assume it's dead and clear
-          // the harvest position.
-          if (!creep) {
-            slot.occuiped = undefined;
-            continue;
-          }
-
-          // Check harvest job progress. If we're done, clear out the slot
-          // so it can be reassigned.
-          slot.occuiped.progress =
-            creep.store.getUsedCapacity(RESOURCE_ENERGY) - slot.occuiped.start;
-          if (slot.occuiped.progress >= slot.occuiped.requested) {
-            // Harvest job is done. Clear out position.
-            slot.occuiped = undefined;
-          } else {
-            // Has the creep made it to their assigned harvest position?
-            if (creep.pos.isEqualTo(slot.x, slot.y)) {
-              // Continue harvesting for this tick
-              creep.harvest(source);
-            } else {
-              // Move to the harvest position using the serialized path string
-              // generated when the harvest position was assigned.
-              switch (creep.moveByPath(slot.occuiped.path)) {
-                case ERR_TIRED:
-                  creep.say(`Fatigued: ${creep.fatigue}`);
-                  break;
-                case ERR_NO_BODYPART:
-                  creep.say("No MOVE parts!");
-                  break;
-                case ERR_NOT_FOUND:
-                case ERR_INVALID_ARGS:
-                  // Fall back to using moveTo to reach harvest position
-                  // to avoid stalling out.
-                  creep.say("BAD PATH");
-                  creep.moveTo(slot.x, slot.y);
-              }
-            }
-          }
+      if (constants.debug) {
+        const { done, dead } = insight.cleanUp;
+        if (done || dead) {
+          console.log(
+            `${source.source.id} cleaned | done: ${done}, dead: ${dead}`
+          );
         }
       }
     }
@@ -115,10 +81,13 @@ export default class ResourceManager extends ManagerBase {
     // Assign unoccupied harvest positions to creeps waiting in the queue
     if (this.harvestQueue.length) {
       // Get the number of unoccupied harvest positions
-      const unoccupied = this.memory.sources
-        .map(s => s.harvestPositions)
-        .reduce((acc, val) => acc.concat(val), [])
-        .filter(pos => !pos.occuiped).length;
+      const unoccupied = this.managedSources
+        .map(ms => ms.unoccupiedPositions.length)
+        .reduce((acc, val) => acc + val);
+      // const unoccupied = this.memory.sources
+      //   .map(s => s.harvestPositions)
+      //   .reduce((acc, val) => acc.concat(val), [])
+      //   .filter(pos => !pos.occuiped).length;
 
       // The number of assignments is equal to either the number of unoccupied
       // spaces or the number of creeps in the queue, whichever is smallest.
@@ -143,13 +112,17 @@ export default class ResourceManager extends ManagerBase {
         }
 
         // Assign the creep to the first available harvest position
-        if (this.firstAvailableHarvestPosition) {
+        // TODO: Find best available position based on creep's position
+        const harvestPos = this.getAvailableHarvestPosition();
+        if (harvestPos) {
+          // Create RoomPosition instance so we can generate a path string.
           const pos = new RoomPosition(
-            this.firstAvailableHarvestPosition.x,
-            this.firstAvailableHarvestPosition.y,
+            harvestPos.x,
+            harvestPos.y,
             this.room.name
           );
-          this.firstAvailableHarvestPosition.occuiped = {
+
+          harvestPos.occuiped = {
             creepId: harvestRequest[0],
             requested: harvestRequest[1],
             start: creep.store.getUsedCapacity(RESOURCE_ENERGY),
@@ -173,8 +146,8 @@ export default class ResourceManager extends ManagerBase {
     // Highlight occupiable resource positions while in debug mode
     if (constants.debug) {
       const visual = new RoomVisual(this.room.name);
-      const positions = this.memory.sources
-        .map(s => s.harvestPositions)
+      const positions = this.managedSources
+        .map(s => s.positions)
         .reduce((acc, val) => acc.concat(val), []);
       for (const pos of positions) {
         const color = pos.occuiped
@@ -355,7 +328,7 @@ export default class ResourceManager extends ManagerBase {
    */
   private init(): void {
     if (!this.memory) {
-      const managedResources: ManagedResource[] = [];
+      const managedResources: ManagedSourceMemory[] = [];
 
       // Gather energy sources and determine occupiable positions around them
       const sources = this.room.find(FIND_SOURCES);

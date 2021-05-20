@@ -3,16 +3,22 @@ interface WithdrawOpts {
   ignoreStores?: boolean;
 }
 
-interface ManagedResource {
+interface ManagedSourceMemory {
   sourceId: Id<Source>;
   harvestPositions: OccupiablePosition[];
 }
+
+type Concrete<Type> = {
+  [Property in keyof Type]-?: Type[Property];
+};
 
 interface OccupiablePosition {
   x: number;
   y: number;
   occuiped?: HarvestJob;
 }
+
+type OccupiedPosition = Concrete<OccupiablePosition>;
 
 interface HarvestJob {
   creepId: Id<Creep>;
@@ -23,8 +29,12 @@ interface HarvestJob {
 }
 
 interface ResourceManagerMemory {
-  sources: ManagedResource[];
+  sources: ManagedSourceMemory[];
   containers: Id<StructureContainer>[];
   storageUnits: Id<StructureStorage>[];
   harvestQueue: [Id<Creep>, number][];
+}
+
+interface StationInsights {
+  cleanUp: { done: number; dead: number };
 }
