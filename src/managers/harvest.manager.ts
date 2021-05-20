@@ -9,7 +9,11 @@ export default class HarvestManager extends ManagerBase {
   private room: Room;
   private resourceManager: ResourceManager;
 
-  public constructor(room: Room, harvesterMax: number, resourceManager: ResourceManager) {
+  public constructor(
+    room: Room,
+    harvesterMax: number,
+    resourceManager: ResourceManager
+  ) {
     super();
     this.room = room;
     this.harvesterMax = harvesterMax;
@@ -17,7 +21,9 @@ export default class HarvestManager extends ManagerBase {
 
     this.harvesters = _.filter(
       Game.creeps,
-      (creep: Creep) => creep.memory.role === HarvestManager.roleHarvester && creep.room.name === this.room.name
+      (creep: Creep) =>
+        creep.memory.role === HarvestManager.roleHarvester &&
+        creep.room.name === this.room.name
     );
   }
 
@@ -38,16 +44,24 @@ export default class HarvestManager extends ManagerBase {
   }
 
   private work(harvester: Creep) {
-    if (harvester.memory.harvesting && harvester.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+    if (
+      harvester.memory.harvesting &&
+      harvester.store.getFreeCapacity(RESOURCE_ENERGY) === 0
+    ) {
       harvester.memory.harvesting = false;
     }
-    if (!harvester.memory.harvesting && harvester.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+    if (
+      !harvester.memory.harvesting &&
+      harvester.store.getUsedCapacity(RESOURCE_ENERGY) === 0
+    ) {
       harvester.memory.harvesting = true;
       harvester.say("🔄 harvest");
     }
 
     if (harvester.memory.harvesting) {
-      this.resourceManager.withdraw(harvester, RESOURCE_ENERGY, { ignoreStores: true });
+      this.resourceManager.withdraw(harvester, RESOURCE_ENERGY, {
+        ignoreStores: true
+      });
       return;
     }
 
@@ -66,25 +80,36 @@ export default class HarvestManager extends ManagerBase {
     // If spawns, extension, and towers are good, default to containers
     if (!structure) {
       structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
-        filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getFreeCapacity(RESOURCE_ENERGY)
+        filter: s =>
+          s.structureType === STRUCTURE_CONTAINER &&
+          s.store.getFreeCapacity(RESOURCE_ENERGY)
       });
     }
 
     if (structure) {
       // Deposit energy into structure
       if (harvester.transfer(structure, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-        harvester.moveTo(structure, { visualizePathStyle: { stroke: palette.PATH_COLOR_TRANSFER } });
+        harvester.moveTo(structure, {
+          visualizePathStyle: { stroke: palette.PATH_COLOR_TRANSFER }
+        });
       }
     } else {
       // No where to store energy. Do we have a high priority build target?
       if (this.schedule.highPriorityBuild) {
         const target = Game.getObjectById(this.schedule.highPriorityBuild);
         if (target && harvester.build(target) === ERR_NOT_IN_RANGE) {
-          harvester.moveTo(target, { visualizePathStyle: { stroke: palette.PATH_COLOR_BUILD } });
+          harvester.moveTo(target, {
+            visualizePathStyle: { stroke: palette.PATH_COLOR_BUILD }
+          });
         }
       } else if (harvester.room.controller) {
-        if (harvester.upgradeController(harvester.room.controller) === ERR_NOT_IN_RANGE) {
-          harvester.moveTo(harvester.room.controller, { visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE } });
+        if (
+          harvester.upgradeController(harvester.room.controller) ===
+          ERR_NOT_IN_RANGE
+        ) {
+          harvester.moveTo(harvester.room.controller, {
+            visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE }
+          });
         }
       }
     }
@@ -96,7 +121,9 @@ export default class HarvestManager extends ManagerBase {
       const name = `Harvester${Game.time}`;
       const parts = [WORK, CARRY, MOVE];
       console.log(`Spawning new harvester: ${name}`);
-      spawn.spawnCreep(parts, name, { memory: { role: HarvestManager.roleHarvester, harvesting: false } });
+      spawn.spawnCreep(parts, name, {
+        memory: { role: HarvestManager.roleHarvester, harvesting: false }
+      });
     }
   }
 }

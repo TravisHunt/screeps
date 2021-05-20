@@ -92,7 +92,20 @@ export default class ResourceManager extends ManagerBase {
             } else {
               // Move to the harvest position using the serialized path string
               // generated when the harvest position was assigned.
-              creep.moveByPath(slot.occuiped.path);
+              switch (creep.moveByPath(slot.occuiped.path)) {
+                case ERR_TIRED:
+                  creep.say(`Fatigued: ${creep.fatigue}`);
+                  break;
+                case ERR_NO_BODYPART:
+                  creep.say("No MOVE parts!");
+                  break;
+                case ERR_NOT_FOUND:
+                case ERR_INVALID_ARGS:
+                  // Fall back to using moveTo to reach harvest position
+                  // to avoid stalling out.
+                  creep.say("BAD PATH");
+                  creep.moveTo(slot.x, slot.y);
+              }
             }
           }
         }
@@ -191,6 +204,7 @@ export default class ResourceManager extends ManagerBase {
       case RESOURCE_ENERGY:
         return this.withdrawEnergy(creep, opts);
       default:
+        console.log("ResourceManager.withdraw: RESOURCE NOT IMPLEMENTED");
         return utils.ERR_RESOURCE_NOT_IMPLEMENTED;
     }
   }
@@ -217,10 +231,9 @@ export default class ResourceManager extends ManagerBase {
         : creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
     if (constants.debug) {
+      const storeYesNo = usingStore ? "YES" : "NO";
       console.log(
-        `Creep: ${creep.id}, usingStore: ${
-          usingStore ? "YES" : "NO"
-        }, amount: ${amount}`
+        `Creep: ${creep.id}, usingStore: ${storeYesNo}, amount: ${amount}`
       );
     }
 
