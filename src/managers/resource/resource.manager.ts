@@ -157,9 +157,9 @@ export default class ResourceManager extends ManagerBase {
    * manager will provide what it can if the entire order cannot be filled.
    * If no amount is specified, the manager will attempt to fill the creep to
    * capacity.
-   * @param creep The creep that needs the resource
-   * @param type The type of resource being requested
-   * @param opts Optional values for withdraw request
+   * @param creep - The creep that needs the resource
+   * @param type - The type of resource being requested
+   * @param opts - Optional values for withdraw request
    * @returns A code indicating the status of the withdraw request
    */
   public withdraw<R extends ResourceConstant>(creep: Creep, type: R, opts?: WithdrawOpts): utils.ResourceReturnCode {
@@ -171,6 +171,17 @@ export default class ResourceManager extends ManagerBase {
     }
   }
 
+  /**
+   * Commands the creep to withdraw or harvest energy from managed resources.
+   * Calling withdrawEnergy without options prioritizes storage and container
+   * structures. If no viable storage or container structures are present, or
+   * the ignoreStores option was specified, the creep is entered into a queue
+   * used for managing access to the source nodes. If no amount is specified,
+   * this function will attempt to fill the creep's free energy capacity.
+   * @param creep - Creep instance requesting energy
+   * @param opts - Options dictating how energy is obtained, and how much is obtained.
+   * @returns Status code for energy withdraw process.
+   */
   private withdrawEnergy(creep: Creep, opts?: WithdrawOpts): utils.ResourceReturnCode {
     const usingStore = !opts || !opts.ignoreStores;
     const amount = opts && opts.amount && opts.amount > 0 ? opts.amount : creep.store.getFreeCapacity(RESOURCE_ENERGY);
@@ -198,22 +209,61 @@ export default class ResourceManager extends ManagerBase {
     return utils.CREEP_IN_HARVEST_QUEUE;
   }
 
+  /**
+   * Commands the creep to harvest from the target. If the target is not within
+   * range, commands the creep to move toward the target. In the event that
+   * the target does not have the specified amount of the resource, the creep
+   * will be given what's available.
+   * @param creep - Creep instance requesting resources.
+   * @param type - Type of resource to withdraw.
+   * @param target - Structure to withdraw from.
+   * @param amount - Amount to withdraw.
+   * @returns A code indicating the status of the withdraw.
+   */
   private static creepWithdrawFrom<R extends ResourceConstant>(
     creep: Creep,
     type: R,
-    target: Structure<StructureConstant>,
+    target: StructureHasStore,
     amount?: number
   ): utils.ResourceReturnCode {
     let retCode: utils.ResourceReturnCode = utils.OK;
 
-    if (creep.withdraw(target, type, amount) === ERR_NOT_IN_RANGE) {
-      creep.moveTo(target, { visualizePathStyle: { stroke: palette.PATH_COLOR_HARVEST } });
-      retCode = utils.MOVING_TO_TARGET;
+    // TODO: I think this allows me to ensure that targets without stores
+    // never get to this point. Definitely test.
+    const targetAsWithdrawType = target as WithdrawUnionType;
+
+    switch (creep.withdraw(targetAsWithdrawType, type, amount)) {
+      case ERR_INVALID_ARGS:
+        throw new Error(`ResourceManager.creepWithdrawFrom: type = ${type}, amount = ${amount || "undefined"}`);
+      case ERR_INVALID_TARGET:
+        throw new Error(`ResourceManager.creepWithdrawFrom: Was passed target incapable of containing ${type}`);
+      case ERR_NOT_ENOUGH_RESOURCES:
+        // Is this target of a type that has a store?
+        if ("store" in target) {
+          const available = target.store[type];
+          if (available) creep.withdraw(targetAsWithdrawType, type, available);
+        }
+        break;
+      case ERR_NOT_IN_RANGE:
+        creep.moveTo(target, { visualizePathStyle: { stroke: palette.PATH_COLOR_HARVEST } });
+        retCode = utils.MOVING_TO_TARGET;
+        break;
+      case OK:
+      case ERR_NOT_OWNER:
+      case ERR_BUSY:
+      case ERR_FULL:
+      default:
     }
 
     return retCode;
   }
 
+  /**
+   * Checks if any harvest positions are currently being occupied by a creep
+   * with the given Id string.
+   * @param creepId - Id string of a Creep instance.
+   * @returns True if the creep is harvesting, otherwise False.
+   */
   private isCreepHarvesting(creepId: Id<Creep>): boolean {
     let harvesting = false;
 
@@ -267,8 +317,8 @@ export default class ResourceManager extends ManagerBase {
 
   /**
    * Get all occupiable positions bordering the given source.
-   * @param source A harvestable source
-   * @returns An array of occupiable positions
+   * @param source - A harvestable source.
+   * @returns An array of occupiable positions.
    */
   private static getOccupiablePositionsForSource(source: Source): OccupiablePosition[] {
     const positions: OccupiablePosition[] = [];

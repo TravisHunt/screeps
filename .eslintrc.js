@@ -20,7 +20,7 @@ module.exports = {
     project: "tsconfig.json",
     sourceType: "module"
   },
-  plugins: ["@typescript-eslint", "import", "prettier"],
+  plugins: ["@typescript-eslint", "import", "prettier", "eslint-plugin-tsdoc"],
   settings: {
     "import/parsers": {
       "@typescript-eslint/parser": [".ts", ".tsx"]
@@ -30,6 +30,7 @@ module.exports = {
     }
   },
   rules: {
+    "tsdoc/syntax": "warn",
     "@typescript-eslint/array-type": "error",
     "@typescript-eslint/consistent-type-assertions": "error",
     "@typescript-eslint/consistent-type-definitions": "error",

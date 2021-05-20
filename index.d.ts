@@ -12,6 +12,19 @@ interface CreepMemory {
   buildTarget?: Id<ConstructionSite>;
 }
 
+type WithdrawUnionType = Ruin | Tombstone | Structure<StructureConstant>;
+
+type StructureHasStore =
+  | RoomObject
+  | Creep
+  | PowerCreep
+  | Ruin
+  | StructureStorage
+  | StructureTerminal
+  | StructureContainer
+  | StructureFactory
+  | Tombstone;
+
 type BuildSite = RoomPosition | RoomPosition[];
 type BuildType = "road" | "ext";
 
