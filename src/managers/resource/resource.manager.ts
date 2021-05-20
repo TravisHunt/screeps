@@ -3,6 +3,12 @@ import * as utils from "./utils";
 import ManagerBase from "managers/base.manager";
 import HarvestQueue from "./HarvestQueue";
 import * as palette from "palette";
+import {
+  EnergyStructure,
+  StoreStructure,
+  isEnergyStructure,
+  isStoreStructure
+} from "utils/typeGuards";
 
 export default class ResourceManager extends ManagerBase {
   private room: Room;
@@ -270,16 +276,12 @@ export default class ResourceManager extends ManagerBase {
   private static creepWithdrawFrom<R extends ResourceConstant>(
     creep: Creep,
     type: R,
-    target: StructureHasStore,
+    target: Ruin | Tombstone | EnergyStructure | StoreStructure,
     amount?: number
   ): utils.ResourceReturnCode {
     let retCode: utils.ResourceReturnCode = utils.OK;
 
-    // TODO: I think this allows me to ensure that targets without stores
-    // never get to this point. Definitely test.
-    const targetAsWithdrawType = target as WithdrawUnionType;
-
-    switch (creep.withdraw(targetAsWithdrawType, type, amount)) {
+    switch (creep.withdraw(target, type, amount)) {
       case ERR_INVALID_ARGS:
         throw new Error(
           `ResourceManager.creepWithdrawFrom: type = ${type}, amount = ${
@@ -292,10 +294,10 @@ export default class ResourceManager extends ManagerBase {
         );
       case ERR_NOT_ENOUGH_RESOURCES:
         // Is this target of a type that has a store?
-        if ("store" in target) {
-          const available = target.store[type];
-          if (available) creep.withdraw(targetAsWithdrawType, type, available);
-        }
+        if (isEnergyStructure(target))
+          creep.withdraw(target, type, target.energy);
+        else if (isStoreStructure(target))
+          creep.withdraw(target, type, target.store[type]);
         break;
       case ERR_NOT_IN_RANGE:
         creep.moveTo(target, {
