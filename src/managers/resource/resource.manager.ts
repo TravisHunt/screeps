@@ -13,8 +13,7 @@ import {
 
 export default class ResourceManager extends ManagerBase {
   private room: Room;
-  // private sources: Source[];
-  private managedSources: ManagedSource[] = [];
+  private sources: ManagedSource[] = [];
   private containers: StructureContainer[] = [];
   private storageUnits: StructureStorage[] = [];
   private harvestQueue: HarvestQueue;
@@ -25,17 +24,15 @@ export default class ResourceManager extends ManagerBase {
 
     this.init();
 
-    this.managedSources = this.memory.sources.map(s => new ManagedSource(s));
+    this.sources = this.memory.sources.map(s => new ManagedSource(s));
 
-    // this.sources = this.memory.sources.map(
-    //   s => Game.getObjectById(s.sourceId) as Source
-    // );
     this.containers = this.memory.containers.map(
       id => Game.getObjectById(id) as StructureContainer
     );
     this.storageUnits = this.memory.storageUnits.map(
       id => Game.getObjectById(id) as StructureStorage
     );
+
     this.harvestQueue = new HarvestQueue(this.memory.harvestQueue || []);
   }
 
@@ -54,7 +51,7 @@ export default class ResourceManager extends ManagerBase {
   }
 
   private getAvailableHarvestPosition(): OccupiablePosition | undefined {
-    for (const managed of this.managedSources) {
+    for (const managed of this.sources) {
       const pos = managed.getAvailablePosition();
       if (pos) return pos;
     }
@@ -65,14 +62,14 @@ export default class ResourceManager extends ManagerBase {
   public run(): void {
     // Run harvest jobs for creeps occupying harvest positions.
     // Clear occupied spaces where the occupier is done harvesting.
-    for (const source of this.managedSources) {
+    for (const source of this.sources) {
       const insight = source.run();
 
       if (constants.debug) {
         const { done, dead } = insight.cleanUp;
         if (done || dead) {
           console.log(
-            `${source.source.id} cleaned | done: ${done}, dead: ${dead}`
+            `Source ${source.source.id} cleaned | done: ${done}, dead: ${dead}`
           );
         }
       }
@@ -81,13 +78,9 @@ export default class ResourceManager extends ManagerBase {
     // Assign unoccupied harvest positions to creeps waiting in the queue
     if (this.harvestQueue.length) {
       // Get the number of unoccupied harvest positions
-      const unoccupied = this.managedSources
+      const unoccupied = this.sources
         .map(ms => ms.unoccupiedPositions.length)
         .reduce((acc, val) => acc + val);
-      // const unoccupied = this.memory.sources
-      //   .map(s => s.harvestPositions)
-      //   .reduce((acc, val) => acc.concat(val), [])
-      //   .filter(pos => !pos.occuiped).length;
 
       // The number of assignments is equal to either the number of unoccupied
       // spaces or the number of creeps in the queue, whichever is smallest.
@@ -146,7 +139,7 @@ export default class ResourceManager extends ManagerBase {
     // Highlight occupiable resource positions while in debug mode
     if (constants.debug) {
       const visual = new RoomVisual(this.room.name);
-      const positions = this.managedSources
+      const positions = this.sources
         .map(s => s.positions)
         .reduce((acc, val) => acc.concat(val), []);
       for (const pos of positions) {
@@ -203,14 +196,11 @@ export default class ResourceManager extends ManagerBase {
         ? opts.amount
         : creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
-    if (constants.debug) {
-      const storeYesNo = usingStore ? "YES" : "NO";
-      console.log(
-        `Creep: ${creep.id}, usingStore: ${storeYesNo}, amount: ${amount}`
-      );
-    }
-
     if (usingStore) {
+      if (constants.debug) {
+        console.log(`Creep: ${creep.id}, usingStore: "YES", amount: ${amount}`);
+      }
+
       // find first available storage unit or container with energy
       // move creep to this store
       const viableStorage = this.storageUnits.find(
@@ -241,8 +231,7 @@ export default class ResourceManager extends ManagerBase {
       !this.isCreepHarvesting(creep.id) &&
       !this.harvestQueue.containsCreep(creep.id)
     ) {
-      const count = this.harvestQueue.enqueue([creep.id, amount]);
-      if (constants.debug) console.log(`Queue length: ${count}`);
+      this.harvestQueue.enqueue([creep.id, amount]);
     }
 
     return utils.CREEP_IN_HARVEST_QUEUE;
