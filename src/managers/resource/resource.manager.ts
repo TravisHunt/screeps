@@ -26,9 +26,11 @@ export default class ResourceManager extends ManagerBase {
 
     this.sources = this.memory.sources.map(s => new ManagedSource(s));
 
-    this.containers = this.memory.containers.map(
-      id => Game.getObjectById(id) as StructureContainer
-    );
+    // const containers = this.memory.containers
+    this.containers = this.memory.containers
+      .map(id => Game.getObjectById(id))
+      .filter(c => c !== null) as StructureContainer[];
+
     this.storageUnits = this.memory.storageUnits.map(
       id => Game.getObjectById(id) as StructureStorage
     );
@@ -175,6 +177,18 @@ export default class ResourceManager extends ManagerBase {
     }
   }
 
+  public getInNeedOfRepair(): Structure<StructureConstant>[] {
+    const structures: Structure<StructureConstant>[] = [];
+
+    for (const source of this.sources) {
+      source.positionsInNeedOfRepair.forEach(s => structures.push(s));
+    }
+
+    // TODO: handle managed containers and storage
+
+    return structures;
+  }
+
   /**
    * Commands the creep to withdraw or harvest energy from managed resources.
    * Calling withdrawEnergy without options prioritizes storage and container
@@ -190,6 +204,11 @@ export default class ResourceManager extends ManagerBase {
     creep: Creep,
     opts?: WithdrawOpts
   ): utils.ResourceReturnCode {
+    // For now, don't do anything if the creep is already harvesting or waiting.
+    if (this.isCreepHarvesting(creep.id)) return utils.CREEP_ALREADY_HARVESTING;
+    if (this.harvestQueue.containsCreep(creep.id))
+      return utils.CREEP_IN_HARVEST_QUEUE;
+
     const usingStore = !opts || !opts.ignoreStores;
     const amount =
       opts && opts.amount && opts.amount > 0
@@ -197,42 +216,41 @@ export default class ResourceManager extends ManagerBase {
         : creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
     if (usingStore) {
-      if (constants.debug) {
-        console.log(`Creep: ${creep.id}, usingStore: "YES", amount: ${amount}`);
-      }
-
       // find first available storage unit or container with energy
       // move creep to this store
       const viableStorage = this.storageUnits.find(
-        su => su.store[RESOURCE_ENERGY] > amount
+        su => su.store[RESOURCE_ENERGY] > 0
       );
-      if (viableStorage)
+      if (viableStorage) {
+        if (constants.debug)
+          console.log(`${creep.name} Using Storage ${viableStorage.id}`);
+
         return ResourceManager.creepWithdrawFrom(
           creep,
           RESOURCE_ENERGY,
           viableStorage,
           amount
         );
+      }
       const viableContainer = this.containers.find(
-        c => c.store[RESOURCE_ENERGY] > amount
+        c => c.store[RESOURCE_ENERGY] > 0
       );
-      if (viableContainer)
+      if (viableContainer) {
+        if (constants.debug)
+          console.log(`${creep.name} Using Storage ${viableContainer.id}`);
+
         return ResourceManager.creepWithdrawFrom(
           creep,
           RESOURCE_ENERGY,
           viableContainer,
           amount
         );
+      }
     }
 
     // Check if this creep is already harvesting or waiting in the source queue
     // if not, enter creep into source queue.
-    if (
-      !this.isCreepHarvesting(creep.id) &&
-      !this.harvestQueue.containsCreep(creep.id)
-    ) {
-      this.harvestQueue.enqueue([creep.id, amount]);
-    }
+    this.harvestQueue.enqueue([creep.id, amount]);
 
     return utils.CREEP_IN_HARVEST_QUEUE;
   }
@@ -273,6 +291,7 @@ export default class ResourceManager extends ManagerBase {
           creep.withdraw(target, type, target.energy);
         else if (isStoreStructure(target))
           creep.withdraw(target, type, target.store[type]);
+        else console.log("HERPDERP");
         break;
       case ERR_NOT_IN_RANGE:
         creep.moveTo(target, {
@@ -285,6 +304,7 @@ export default class ResourceManager extends ManagerBase {
       case ERR_BUSY:
       case ERR_FULL:
       default:
+        console.log("WHAT???");
     }
 
     return retCode;
@@ -299,8 +319,8 @@ export default class ResourceManager extends ManagerBase {
   private isCreepHarvesting(creepId: Id<Creep>): boolean {
     let harvesting = false;
 
-    for (const source of this.memory.sources) {
-      for (const pos of source.harvestPositions) {
+    for (const source of this.sources) {
+      for (const pos of source.positions) {
         if (pos.occuiped && pos.occuiped.creepId === creepId) {
           harvesting = true;
           break;
@@ -317,7 +337,7 @@ export default class ResourceManager extends ManagerBase {
    */
   private init(): void {
     if (!this.memory) {
-      const managedResources: ManagedSourceMemory[] = [];
+      const managedResources: ManagedStationMemory<Source>[] = [];
 
       // Gather energy sources and determine occupiable positions around them
       const sources = this.room.find(FIND_SOURCES);
@@ -325,7 +345,11 @@ export default class ResourceManager extends ManagerBase {
         const harvestPositions = ResourceManager.getOccupiablePositionsForSource(
           source
         );
-        managedResources.push({ sourceId: source.id, harvestPositions });
+        managedResources.push({
+          roomName: this.room.name,
+          stationId: source.id,
+          positions: harvestPositions
+        });
       }
 
       // Gather any containers or storage units in the room

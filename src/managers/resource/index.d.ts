@@ -3,9 +3,10 @@ interface WithdrawOpts {
   ignoreStores?: boolean;
 }
 
-interface ManagedSourceMemory {
-  sourceId: Id<Source>;
-  harvestPositions: OccupiablePosition[];
+interface ManagedStationMemory<Type> {
+  roomName: string;
+  stationId: Id<Type>;
+  positions: OccupiablePosition[];
 }
 
 type Concrete<Type> = {
@@ -29,7 +30,7 @@ interface HarvestJob {
 }
 
 interface ResourceManagerMemory {
-  sources: ManagedSourceMemory[];
+  sources: ManagedStationMemory<Source>[];
   containers: Id<StructureContainer>[];
   storageUnits: Id<StructureStorage>[];
   harvestQueue: [Id<Creep>, number][];

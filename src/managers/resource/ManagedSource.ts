@@ -1,34 +1,12 @@
-export default class ManagedSource {
-  public source: Source;
-  private _sourceId: Id<Source>;
-  private _positions: OccupiablePosition[];
+import ManagedStation from "./ManagedStation";
 
-  public constructor(memory: ManagedSourceMemory) {
-    this._sourceId = memory.sourceId;
-    this._positions = memory.harvestPositions;
-
-    const source = Game.getObjectById(this._sourceId);
-    if (source) this.source = source;
-    else throw new Error(`ManagedSource: no source with id ${this._sourceId}`);
+export default class ManagedSource extends ManagedStation<Source> {
+  public constructor(memory: ManagedStationMemory<Source>) {
+    super(memory);
   }
 
-  public get positions(): OccupiablePosition[] {
-    return this._positions;
-  }
-
-  public get unoccupiedPositions(): OccupiablePosition[] {
-    return this._positions.filter(p => !p.occuiped);
-  }
-
-  public get occupiedPositions(): OccupiedPosition[] {
-    return this._positions.filter(p => p.occuiped) as OccupiedPosition[];
-  }
-
-  public getAvailablePosition(): OccupiablePosition | undefined {
-    for (const pos of this._positions) {
-      if (!pos.occuiped) return pos;
-    }
-    return undefined;
+  public get source(): Source {
+    return this.station;
   }
 
   public run(): StationInsights {
@@ -80,19 +58,20 @@ export default class ManagedSource {
       } else {
         // Move to the harvest position using the serialized path string
         // generated when the harvest position was assigned.
-        switch (creep.moveByPath(pos.occuiped.path)) {
+        // switch (creep.moveByPath(pos.occuiped.path)) {
+        switch (creep.moveTo(pos.x, pos.y)) {
           case ERR_TIRED:
             creep.say(`Fatigued: ${creep.fatigue}`);
             break;
           case ERR_NO_BODYPART:
             creep.say("No MOVE parts!");
             break;
-          case ERR_NOT_FOUND:
-          case ERR_INVALID_ARGS:
-            // Fall back to using moveTo to reach harvest position
-            // to avoid stalling out.
-            creep.say("BAD PATH");
-            creep.moveTo(pos.x, pos.y);
+          // case ERR_NOT_FOUND:
+          // case ERR_INVALID_ARGS:
+          //   // Fall back to using moveTo to reach harvest position
+          //   // to avoid stalling out.
+          //   creep.say("BAD PATH");
+          //   creep.moveTo(pos.x, pos.y);
         }
       }
     }

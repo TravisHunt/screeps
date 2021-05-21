@@ -5,7 +5,7 @@ import ResourceManager from "managers/resource/resource.manager";
 import UpgradeManager from "managers/upgrade.manager";
 
 const HARVESTER_MAX = 2;
-const BUILDER_MAX = 2;
+const BUILDER_MAX = 1;
 const REPAIRMAN_MAX = 1;
 const UPGRADER_MAX = 1;
 
@@ -30,16 +30,34 @@ export const loop = ErrorMapper.wrapLoop(() => {
   // Visualize spawning
   if (spawn1.spawning) {
     const spawningCreep = Game.creeps[spawn1.spawning.name];
-    spawn1.room.visual.text("🛠️" + spawningCreep.memory.role, spawn1.pos.x + 1, spawn1.pos.y, {
-      align: "left",
-      opacity: 0.8
-    });
+    spawn1.room.visual.text(
+      "🛠️" + spawningCreep.memory.role,
+      spawn1.pos.x + 1,
+      spawn1.pos.y,
+      {
+        align: "left",
+        opacity: 0.8
+      }
+    );
   }
 
   // Build and start managers for this room
-  const harvestManager = new HarvestManager(spawn1.room, HARVESTER_MAX, resourceManager);
-  const buildManager = new BuildManager(spawn1.room, BUILDER_MAX, REPAIRMAN_MAX, resourceManager);
-  const upgradeManager = new UpgradeManager(spawn1.room, UPGRADER_MAX, resourceManager);
+  const harvestManager = new HarvestManager(
+    spawn1.room,
+    HARVESTER_MAX,
+    resourceManager
+  );
+  const buildManager = new BuildManager(
+    spawn1.room,
+    BUILDER_MAX,
+    REPAIRMAN_MAX,
+    resourceManager
+  );
+  const upgradeManager = new UpgradeManager(
+    spawn1.room,
+    UPGRADER_MAX,
+    resourceManager
+  );
 
   harvestManager.run();
   buildManager.run();

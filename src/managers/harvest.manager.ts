@@ -120,10 +120,18 @@ export default class HarvestManager extends ManagerBase {
       // TODO: get parts based on spawn capacity
       const name = `Harvester${Game.time}`;
       const parts = [WORK, CARRY, MOVE];
+      const big = [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+
       console.log(`Spawning new harvester: ${name}`);
-      spawn.spawnCreep(parts, name, {
+      const res = spawn.spawnCreep(big, name, {
         memory: { role: HarvestManager.roleHarvester, harvesting: false }
       });
+
+      if (res === ERR_NOT_ENOUGH_ENERGY) {
+        spawn.spawnCreep(parts, name, {
+          memory: { role: HarvestManager.roleHarvester, harvesting: false }
+        });
+      }
     }
   }
 }
