@@ -1,4 +1,5 @@
 interface Memory {
+  roomState: Record<string, RoomState>;
   buildSchedules: Record<string, BuildSchedule>;
   resources: Record<string, ResourceManagerMemory>;
 }
@@ -10,6 +11,12 @@ interface CreepMemory {
   harvesting?: boolean;
   jobId?: number;
   buildTarget?: Id<ConstructionSite>;
+}
+
+interface RoomState {
+  roadFromSpawnToCtrl: RoomBuildJobState;
+  roadFromSpawnToEnergySources: RoomBuildJobState;
+  sourceQueueRoad: RoomBuildJobState;
 }
 
 type WithdrawUnionType = Ruin | Tombstone | Structure<StructureConstant>;
@@ -47,13 +54,7 @@ interface BuildJob {
 interface BuildSchedule {
   jobs: BuildJob[];
   jobCounter: number;
-  state: RoomBuildMasterList;
   highPriorityBuild?: Id<ConstructionSite>;
-}
-
-interface RoomBuildMasterList {
-  roadFromSpawnToCtrl: RoomBuildJobState;
-  roadFromSpawnToEnergySources: RoomBuildJobState;
 }
 
 interface RoomBuildJobState {

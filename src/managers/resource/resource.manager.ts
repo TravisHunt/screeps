@@ -12,15 +12,13 @@ import {
 } from "utils/typeGuards";
 
 export default class ResourceManager extends ManagerBase {
-  private room: Room;
   private sources: ManagedSource[] = [];
   private containers: StructureContainer[] = [];
   private storageUnits: StructureStorage[] = [];
   private harvestQueue: HarvestQueue;
 
   public constructor(room: Room) {
-    super();
-    this.room = room;
+    super(room);
 
     this.init();
 
@@ -168,6 +166,7 @@ export default class ResourceManager extends ManagerBase {
     type: R,
     opts?: WithdrawOpts
   ): utils.ResourceReturnCode {
+    if (creep.spawning) return utils.ERR_CREEP_SPAWNING;
     switch (type) {
       case RESOURCE_ENERGY:
         return this.withdrawEnergy(creep, opts);

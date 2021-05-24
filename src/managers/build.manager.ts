@@ -1,5 +1,6 @@
 import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
+import * as utils from "managers/resource/utils";
 import * as palette from "palette";
 
 export default class BuildManager extends ManagerBase {
@@ -9,7 +10,6 @@ export default class BuildManager extends ManagerBase {
   public readonly repairmanMax: number;
   public builders: Creep[];
   public repairmen: Creep[];
-  private room: Room;
   private resourceManager: ResourceManager;
 
   public constructor(
@@ -18,8 +18,7 @@ export default class BuildManager extends ManagerBase {
     repairmanMax: number,
     resourceManager: ResourceManager
   ) {
-    super();
-    this.room = room;
+    super(room);
     this.builderMax = builderMax;
     this.repairmanMax = repairmanMax;
     this.resourceManager = resourceManager;
@@ -53,21 +52,11 @@ export default class BuildManager extends ManagerBase {
     if (!this.schedule) {
       this.schedule = {
         jobCounter: 0,
-        jobs: [],
-        state: {
-          roadFromSpawnToCtrl: { inprogress: false, complete: false },
-          roadFromSpawnToEnergySources: { inprogress: false, complete: false }
-        }
+        jobs: []
       };
     } else {
-      const state = this.schedule.state;
-      if (!state.roadFromSpawnToCtrl)
-        state.roadFromSpawnToCtrl = { inprogress: false, complete: false };
-      if (!state.roadFromSpawnToEnergySources)
-        state.roadFromSpawnToEnergySources = {
-          inprogress: false,
-          complete: false
-        };
+      if (!this.schedule.jobCounter) this.schedule.jobCounter = 0;
+      if (!this.schedule.jobs) this.schedule.jobs = [];
     }
   }
 
@@ -79,6 +68,8 @@ export default class BuildManager extends ManagerBase {
     // TODO: handle multiple spawns?
     const spawn = this.room.find(FIND_MY_SPAWNS)[0];
 
+    // Queue job for source queue
+
     // Do we have the max amount of extensions?
     // TODO
 
@@ -87,6 +78,9 @@ export default class BuildManager extends ManagerBase {
 
     // If we haven't started building a road from spawn to ctlr
     this.buildRoadSpawnToCtrl(spawn);
+
+    // Build road for source queue
+    this.buildSourceQueueRoad(spawn);
 
     // Clear out completed jobs
     if (this.schedule.jobs)
@@ -354,13 +348,7 @@ export default class BuildManager extends ManagerBase {
     paths
       .reduce((acc, val) => acc.concat(val), [])
       .forEach(step => {
-        const found = this.room.lookForAt(
-          LOOK_CONSTRUCTION_SITES,
-          step.x,
-          step.y
-        );
-        if (!found.length)
-          this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
+        this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
       });
 
     return job;
@@ -389,21 +377,79 @@ export default class BuildManager extends ManagerBase {
 
     // Queue job's construction sites
     path.forEach(step => {
-      const found = this.room.lookForAt(
-        LOOK_CONSTRUCTION_SITES,
-        step.x,
-        step.y
-      );
-      if (!found.length)
-        this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
+      this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
     });
 
     // Queue job
     return job;
   }
 
+  private buildSourceQueueRoad(spawn: StructureSpawn): void {
+    const jobState = this.roomState.sourceQueueRoad;
+    if (!jobState)
+      throw new Error("Job State Not Configured: Source Queue Road.");
+    if (jobState.complete) return;
+
+    // Road hasn't been planned
+    if (!jobState.inprogress) {
+      // Find queue midpoint flag
+      const mid = this.room
+        .find(FIND_FLAGS, {
+          filter: { name: utils.FLAG_SOURCEQUEUEMIDPOINT }
+        })
+        .shift();
+
+      if (!mid) {
+        console.log("PLACE HARVEST QUEUE MIDPOINT TO BUILD LINE");
+      } else {
+        // Start queue path by getting path from spawn to mid point
+        const paths: PathStep[][] = [];
+        const spawnToMid = spawn.pos.findPathTo(mid.pos, {
+          ignoreCreeps: true,
+          ignoreRoads: true,
+          ignoreDestructibleStructures: true
+        });
+        paths.push(spawnToMid);
+
+        // Generate paths from midpoint to sources
+        const sources = this.room.find(FIND_SOURCES);
+        for (const source of sources) {
+          const midToSource = mid.pos.findPathTo(source.pos, {
+            ignoreCreeps: true,
+            ignoreRoads: true,
+            ignoreDestructibleStructures: true,
+            range: 1
+          });
+          paths.push(midToSource);
+        }
+
+        // Add new job to this room's schedule
+        const job = this.createMultiRoadBuildJob(paths);
+
+        // Link new job to the room's state
+        jobState.jobId = job.id;
+        jobState.inprogress = true;
+      }
+    } else {
+      if (!jobState.jobId)
+        throw new Error("Job State Error: Job in progress without id.");
+
+      // Job is in progress. Find job to see if it's done
+      const job = this.getJob(jobState.jobId);
+      if (!job) throw new Error("No job for road from spawn to sources");
+
+      // If complete, toggle state flags and wipe ref to job since it will
+      // be wiped from the schedule.
+      if (job.complete) {
+        jobState.inprogress = false;
+        jobState.complete = true;
+        delete jobState.jobId;
+      }
+    }
+  }
+
   private buildRoadSpawnToEnergySources(spawn: StructureSpawn): void {
-    const jobState = this.schedule.state.roadFromSpawnToEnergySources;
+    const jobState = this.roomState.roadFromSpawnToEnergySources;
     if (!jobState)
       throw new Error("Job State Not Configured: Road from spawn to sources.");
     if (jobState.complete) return;
@@ -444,8 +490,8 @@ export default class BuildManager extends ManagerBase {
   }
 
   private buildRoadSpawnToCtrl(spawn: StructureSpawn): void {
-    const roadFromSpawnToCtrl = this.schedule.state.roadFromSpawnToCtrl;
-    if (!roadFromSpawnToCtrl.inprogress && !roadFromSpawnToCtrl.complete) {
+    const jobState = this.roomState.roadFromSpawnToCtrl;
+    if (!jobState.inprogress && !jobState.complete) {
       if (!this.room.controller) throw new Error("Room has no controller");
 
       // Add a new job to this room's schedule
@@ -453,20 +499,20 @@ export default class BuildManager extends ManagerBase {
       const job = this.buildRoadFromTo(spawn.pos, ctrlPos, { range: 1 });
 
       // Link new job to the room's state
-      roadFromSpawnToCtrl.jobId = job.id;
-      roadFromSpawnToCtrl.inprogress = true;
-    } else if (roadFromSpawnToCtrl.inprogress && roadFromSpawnToCtrl.jobId) {
+      jobState.jobId = job.id;
+      jobState.inprogress = true;
+    } else if (jobState.inprogress && jobState.jobId) {
       // This road has been started, so let's check if it's complete
-      const jobRoadSpawnToCtrl = this.getJob(roadFromSpawnToCtrl.jobId);
+      const jobRoadSpawnToCtrl = this.getJob(jobState.jobId);
       if (!jobRoadSpawnToCtrl)
         throw new Error("No job for road from spawn to ctrl");
 
       // If complete, toggle state flags and wipe ref to job since it will be wiped
       // from the schedule.
       if (jobRoadSpawnToCtrl.complete) {
-        roadFromSpawnToCtrl.inprogress = false;
-        roadFromSpawnToCtrl.complete = true;
-        delete roadFromSpawnToCtrl.jobId;
+        jobState.inprogress = false;
+        jobState.complete = true;
+        delete jobState.jobId;
       }
     }
   }

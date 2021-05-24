@@ -20,8 +20,38 @@ export const loop = ErrorMapper.wrapLoop(() => {
   }
 
   // Init memory tables for various processes
+  if (!Memory.roomState) Memory.roomState = {};
   if (!Memory.buildSchedules) Memory.buildSchedules = {};
   if (!Memory.resources) Memory.resources = {};
+
+  for (const room in Game.rooms) {
+    if (room in Memory.roomState === false) {
+      Memory.roomState[room] = {
+        roadFromSpawnToCtrl: { inprogress: false, complete: false },
+        roadFromSpawnToEnergySources: { inprogress: false, complete: false },
+        sourceQueueRoad: { inprogress: false, complete: false }
+      };
+    } else {
+      if (!Memory.roomState[room].roadFromSpawnToCtrl) {
+        Memory.roomState[room].roadFromSpawnToCtrl = {
+          inprogress: false,
+          complete: false
+        };
+      }
+      if (!Memory.roomState[room].roadFromSpawnToEnergySources) {
+        Memory.roomState[room].roadFromSpawnToEnergySources = {
+          inprogress: false,
+          complete: false
+        };
+      }
+      if (!Memory.roomState[room].sourceQueueRoad) {
+        Memory.roomState[room].sourceQueueRoad = {
+          inprogress: false,
+          complete: false
+        };
+      }
+    }
+  }
 
   const spawn1 = Game.spawns.Spawn1;
 

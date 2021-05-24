@@ -4,20 +4,24 @@ import * as palette from "palette";
 
 export default class UpgradeManager extends ManagerBase {
   public static readonly role = "upgrader";
-  public readonly room: Room;
   public readonly creepMax: number;
   public creeps: Creep[];
   private resourceManager: ResourceManager;
 
-  public constructor(room: Room, max: number, resourceManager: ResourceManager) {
-    super();
-    this.room = room;
+  public constructor(
+    room: Room,
+    max: number,
+    resourceManager: ResourceManager
+  ) {
+    super(room);
     this.creepMax = max;
     this.resourceManager = resourceManager;
 
     this.creeps = _.filter(
       Game.creeps,
-      (creep: Creep) => creep.memory.role === UpgradeManager.role && creep.room.name === this.room.name
+      (creep: Creep) =>
+        creep.memory.role === UpgradeManager.role &&
+        creep.room.name === this.room.name
     );
   }
 
@@ -39,13 +43,19 @@ export default class UpgradeManager extends ManagerBase {
     // TODO: make sure the creep is capable of this job
 
     // Harvest if you have no more energy
-    if (!creep.memory.harvesting && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+    if (
+      !creep.memory.harvesting &&
+      creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
+    ) {
       creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
 
     // Upgrade if you're at carrying capacity
-    if (creep.memory.harvesting && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+    if (
+      creep.memory.harvesting &&
+      creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0
+    ) {
       creep.memory.harvesting = false;
       creep.say("⚡ upgrade");
     }
@@ -58,7 +68,9 @@ export default class UpgradeManager extends ManagerBase {
 
     if (creep.room.controller) {
       if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-        creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE } });
+        creep.moveTo(creep.room.controller, {
+          visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE }
+        });
       }
     } else {
       creep.say("ERROR: No ctrl");
@@ -68,8 +80,11 @@ export default class UpgradeManager extends ManagerBase {
   public static create(spawn: StructureSpawn, energyCapacity: number): void {
     const name = `Upgrader${Game.time}`;
     const parts =
-      energyCapacity >= 550 ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE] : [WORK, CARRY, MOVE];
+      energyCapacity >= 550
+        ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]
+        : [WORK, CARRY, MOVE];
     const opts = { memory: { role: this.role, upgrading: false } };
-    if (spawn.spawnCreep(parts, name, opts) === OK) console.log("Spawning new upgrader: " + name);
+    if (spawn.spawnCreep(parts, name, opts) === OK)
+      console.log("Spawning new upgrader: " + name);
   }
 }

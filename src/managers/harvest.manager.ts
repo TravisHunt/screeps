@@ -6,7 +6,6 @@ export default class HarvestManager extends ManagerBase {
   public static readonly roleHarvester = "harvester";
   public readonly harvesterMax: number;
   public harvesters: Creep[];
-  private room: Room;
   private resourceManager: ResourceManager;
 
   public constructor(
@@ -14,8 +13,8 @@ export default class HarvestManager extends ManagerBase {
     harvesterMax: number,
     resourceManager: ResourceManager
   ) {
-    super();
-    this.room = room;
+    super(room);
+
     this.harvesterMax = harvesterMax;
     this.resourceManager = resourceManager;
 
