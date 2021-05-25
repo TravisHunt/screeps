@@ -2,8 +2,8 @@ import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import * as utils from "managers/resource/utils";
 import * as palette from "palette";
-import Build from "./build/Build";
-import BuildQueue from "./resource/BuildQueue";
+import Build from "./Build";
+import BuildQueue from "./BuildQueue";
 
 export default class BuildManager extends ManagerBase {
   public static readonly roleBuilder = "builder";
