@@ -8,6 +8,12 @@ export default class Build {
   private roomName: string;
   private siteIds: Id<ConstructionSite>[];
 
+  /**
+   * Generates an id values by using a simple hashing function on the
+   * coordinates of the construction sites.
+   * @param positions - Construction site positions
+   * @returns Id hash
+   */
   public static generateBuildId(positions: RoomPosition[]): number {
     // Convert room positions into a string by converting the x and y values
     // into characters.
@@ -16,6 +22,11 @@ export default class Build {
     return hash;
   }
 
+  /**
+   * Simple hash function to convert a string to a hashed number
+   * @param posStr - String to hash
+   * @returns hash
+   */
   private static hashPositionString(posStr: string): number {
     let hash = 0;
     if (!posStr.length) return hash;

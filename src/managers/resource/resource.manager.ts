@@ -240,9 +240,6 @@ export default class ResourceManager extends ManagerBase {
         su => su.store[RESOURCE_ENERGY] > 0
       );
       if (viableStorage) {
-        if (constants.debug)
-          console.log(`${creep.name} Using Storage ${viableStorage.id}`);
-
         return ResourceManager.creepWithdrawFrom(
           creep,
           RESOURCE_ENERGY,
@@ -254,9 +251,6 @@ export default class ResourceManager extends ManagerBase {
         c => c.store[RESOURCE_ENERGY] > 0
       );
       if (viableContainer) {
-        if (constants.debug)
-          console.log(`${creep.name} Using Storage ${viableContainer.id}`);
-
         return ResourceManager.creepWithdrawFrom(
           creep,
           RESOURCE_ENERGY,
@@ -309,7 +303,6 @@ export default class ResourceManager extends ManagerBase {
           creep.withdraw(target, type, target.energy);
         else if (isStoreStructure(target))
           creep.withdraw(target, type, target.store[type]);
-        else console.log("HERPDERP");
         break;
       case ERR_NOT_IN_RANGE:
         creep.moveTo(target, {
@@ -322,7 +315,6 @@ export default class ResourceManager extends ManagerBase {
       case ERR_BUSY:
       case ERR_FULL:
       default:
-        console.log("WHAT???");
     }
 
     return retCode;

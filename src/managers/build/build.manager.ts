@@ -46,14 +46,19 @@ export default class BuildManager extends ManagerBase {
     this.buildQueue = new BuildQueue(this.schedule.buildQueue);
   }
 
+  /**
+   * Short-hand for Memory.buildSchedules[this.room.name]
+   */
   public get schedule(): BuildSchedule {
     return Memory.buildSchedules[this.room.name];
   }
-
   public set schedule(schedule: BuildSchedule) {
     Memory.buildSchedules[this.room.name] = schedule;
   }
 
+  /**
+   * Initializes the build schedule at Memory.buildSchedules[this.room.name]
+   */
   private initBuildSchedule(): void {
     if (!this.schedule) {
       this.schedule = {
@@ -140,19 +145,11 @@ export default class BuildManager extends ManagerBase {
     });
   }
 
-  private performJob(creep: Creep): void {
-    switch (creep.memory.role) {
-      case BuildManager.roleBuilder:
-        this.doYourJob(creep);
-        break;
-      case BuildManager.roleRepairman:
-        this.repair(creep);
-        break;
-      default:
-        creep.say("I Have No Role");
-    }
-  }
-
+  /**
+   * Directs a creep to perform the repair job
+   * @remarks TODO: Create a RepairManager
+   * @param creep - Repairman
+   */
   private repair(creep: Creep): void {
     // Harvest if you have no more energy
     if (
@@ -216,6 +213,10 @@ export default class BuildManager extends ManagerBase {
     }
   }
 
+  /**
+   * Directs a creep to perform the build job
+   * @param creep - Builder
+   */
   private doYourJob(creep: Creep): void {
     // TODO: make sure the creep is capable of this job
 
@@ -293,10 +294,16 @@ export default class BuildManager extends ManagerBase {
     }
   }
 
+  /**
+   * Schedules a Builder to be spawned
+   * @param spawn - SpawnStructure
+   * @param energyCapacity - Energy capacity in Room
+   * @returns Spawn status code
+   */
   private static createBuilder(
     spawn: StructureSpawn,
     energyCapacity: number
-  ): void {
+  ): number {
     console.log("Trying to create builder...");
     const name = `Builder${Game.time}`;
     const parts =
@@ -304,14 +311,22 @@ export default class BuildManager extends ManagerBase {
         ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]
         : [WORK, CARRY, MOVE];
 
-    if (
-      spawn.spawnCreep(parts, name, {
-        memory: { role: this.roleBuilder, building: false }
-      }) === OK
-    )
+    const res = spawn.spawnCreep(parts, name, {
+      memory: { role: this.roleBuilder, building: false }
+    });
+
+    if (res === OK) {
       console.log("Spawning new builder: " + name);
+    }
+
+    return res;
   }
 
+  /**
+   * Schedules a Repairman to be spawned
+   * @remarks TODO: Create a RepairManager
+   * @param spawn - Spawn structure
+   */
   private static createRepairman(spawn: StructureSpawn): void {
     const name = `Repairman${Game.time}`;
     console.log("Spawning new repairman: " + name);
@@ -320,6 +335,11 @@ export default class BuildManager extends ManagerBase {
     });
   }
 
+  /**
+   * Queues a build to construct multiple road ways
+   * @param paths - 2D list representing multiple road ways
+   * @returns Memory object for the scheduled build
+   */
   private buildMultipleRoads(paths: PathStep[][]): BuildMemory {
     const steps = paths
       .reduce((acc, val) => acc.concat(val), [])
@@ -336,6 +356,13 @@ export default class BuildManager extends ManagerBase {
     return memory;
   }
 
+  /**
+   * Queues a build to construct a road from point a to point b
+   * @param from - Start position
+   * @param to - End position
+   * @param opts - Path options
+   * @returns Memory object for the scheduled build
+   */
   private buildRoadFromTo(
     from: RoomPosition,
     to: RoomPosition,
@@ -357,6 +384,10 @@ export default class BuildManager extends ManagerBase {
     return memory;
   }
 
+  /**
+   * Queues a build to construct a road for waiting in line for sources
+   * @param spawn - Spawn structure
+   */
   private buildSourceQueueRoad(spawn: StructureSpawn): void {
     const jobState = this.roomState.sourceQueueRoad;
     if (!jobState)
@@ -426,6 +457,10 @@ export default class BuildManager extends ManagerBase {
     }
   }
 
+  /**
+   * Queues a build to construct roads from the spawn to energy sources
+   * @param spawn - Spawn structure
+   */
   private buildRoadSpawnToEnergySources(spawn: StructureSpawn): void {
     const jobState = this.roomState.roadFromSpawnToEnergySources;
     if (!jobState)
@@ -472,6 +507,10 @@ export default class BuildManager extends ManagerBase {
     }
   }
 
+  /**
+   * Queues a build to construct a road from the spawn to the room's controller
+   * @param spawn - Spawn structure
+   */
   private buildRoadSpawnToCtrl(spawn: StructureSpawn): void {
     const jobState = this.roomState.roadFromSpawnToCtrl;
     if (!jobState)

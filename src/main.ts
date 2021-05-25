@@ -4,7 +4,7 @@ import HarvestManager from "managers/harvest.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import UpgradeManager from "managers/upgrade.manager";
 
-const HARVESTER_MAX = 2;
+const HARVESTER_MAX = 3;
 const BUILDER_MAX = 1;
 const REPAIRMAN_MAX = 1;
 const UPGRADER_MAX = 1;
