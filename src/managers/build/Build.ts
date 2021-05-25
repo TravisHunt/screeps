@@ -1,6 +1,6 @@
 export default class Build {
   public id: number;
-  public type: BuildType;
+  public type: BuildableStructureConstant;
   public room: Room;
   public sites: ConstructionSite[] = [];
   public positions: RoomPosition[];
@@ -41,7 +41,7 @@ export default class Build {
   }
 
   public static createMemoryInstance(
-    type: BuildType,
+    type: BuildableStructureConstant,
     roomName: string,
     positions: RoomPosition[]
   ): BuildMemory {

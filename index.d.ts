@@ -20,11 +20,9 @@ interface RoomState {
   sourceQueueRoad: RoomBuildJobState;
 }
 
-type BuildType = "road" | "ext" | "container";
-
 interface BuildMemory {
   id: number;
-  type: BuildType;
+  type: BuildableStructureConstant;
   roomName: string;
   siteIds: Id<ConstructionSite>[];
   positions: RoomPosition[];
@@ -32,7 +30,7 @@ interface BuildMemory {
 }
 
 interface BuildRequest {
-  type: BuildType;
+  type: BuildableStructureConstant;
   positions: RoomPosition[];
 }
 

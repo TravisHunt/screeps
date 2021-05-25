@@ -200,7 +200,7 @@ export default class ResourceManager extends ManagerBase {
     for (const src of sortedByHarvestPosCount) {
       const positions = src.findExpansionPositions();
       if (positions.length) {
-        requests.push({ type: "road", positions });
+        requests.push({ type: STRUCTURE_ROAD, positions });
       }
     }
 

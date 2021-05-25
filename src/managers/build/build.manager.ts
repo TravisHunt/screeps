@@ -103,7 +103,7 @@ export default class BuildManager extends ManagerBase {
 
       if (!isCurrent && !this.buildQueue.containsRequest(req)) {
         req.positions.forEach(pos => {
-          this.room.createConstructionSite(pos.x, pos.y, STRUCTURE_ROAD);
+          this.room.createConstructionSite(pos.x, pos.y, req.type);
         });
         this.buildQueue.enqueue(buildMem);
       }
