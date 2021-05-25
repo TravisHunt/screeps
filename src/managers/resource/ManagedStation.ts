@@ -1,4 +1,4 @@
-export default abstract class ManagedStation<Type> {
+export default abstract class ManagedStation<Type extends RoomObject> {
   protected station: Type;
   protected room: Room;
   protected _positions: OccupiablePosition[];
@@ -48,5 +48,54 @@ export default abstract class ManagedStation<Type> {
       if (!pos.occuiped) return pos;
     }
     return undefined;
+  }
+
+  /**
+   * Returns a list of positions adjacent to the station that could be added
+   * to this station's list of occupiable positions. These positions were likely
+   * no added when the station was initialized due to obstructions, such as
+   * walls.
+   * @remarks
+   * This method returns undefined if not explictly overrided in the derived
+   * station implementation. Override this if you want the derived station to
+   * be considered for occupiable position expansion.
+   * @returns List of RoomPositions
+   */
+  public findExpansionPositions(): RoomPosition[] | undefined {
+    return undefined;
+  }
+
+  /**
+   * Gets all positions adjacent to this room object.
+   * @returns List of RoomPositions adjacent to the managed room object.
+   */
+  public static getAdjacentPositions(
+    pos: RoomPosition,
+    roomName: string,
+    diagonals = true
+  ): RoomPosition[] {
+    const positions: RoomPosition[] = [];
+
+    if (diagonals) {
+      // Scan bordering spaces for occupiable positions
+      for (let x = pos.x - 1; x <= pos.x + 1; x++) {
+        for (let y = pos.y - 1; y <= pos.y + 1; y++) {
+          // stations aren't walkable, so skip
+          if (x === pos.x && y === pos.y) continue;
+          // Don't include positions outside the bounds of the room
+          if (x < 0 || x > 49 || y < 0 || y > 49) continue;
+
+          const adj = new RoomPosition(x, y, roomName);
+          positions.push(adj);
+        }
+      }
+    } else {
+      positions.push(new RoomPosition(pos.x - 1, pos.y, roomName));
+      positions.push(new RoomPosition(pos.x + 1, pos.y, roomName));
+      positions.push(new RoomPosition(pos.x, pos.y - 1, roomName));
+      positions.push(new RoomPosition(pos.x, pos.y + 1, roomName));
+    }
+
+    return positions;
   }
 }

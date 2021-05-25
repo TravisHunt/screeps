@@ -188,6 +188,25 @@ export default class ResourceManager extends ManagerBase {
     return structures;
   }
 
+  public requestBuilds(): BuildRequest[] {
+    const requests: BuildRequest[] = [];
+
+    // Gather any harvest positions that have yet to be built. Sort by harvest
+    // position count so the source with the least amount of positions is
+    // queued first.
+    const sortedByHarvestPosCount = this.sources.sort(
+      (a, b) => a.positions.length - b.positions.length
+    );
+    for (const src of sortedByHarvestPosCount) {
+      const positions = src.findExpansionPositions();
+      if (positions.length) {
+        requests.push({ type: "road", positions });
+      }
+    }
+
+    return requests;
+  }
+
   /**
    * Commands the creep to withdraw or harvest energy from managed resources.
    * Calling withdrawEnergy without options prioritizes storage and container
@@ -335,6 +354,18 @@ export default class ResourceManager extends ManagerBase {
    * by the ResourceManager instance.
    */
   private init(): void {
+    // Gather any containers or storage units in the room
+    const containers = this.room
+      .find(FIND_STRUCTURES, {
+        filter: { structureType: STRUCTURE_CONTAINER }
+      })
+      .map(c => c as StructureContainer);
+    const storageUnits = this.room
+      .find(FIND_MY_STRUCTURES, {
+        filter: { structureType: STRUCTURE_STORAGE }
+      })
+      .map(s => s as StructureStorage);
+
     if (!this.memory) {
       const managedResources: ManagedStationMemory<Source>[] = [];
 
@@ -351,24 +382,16 @@ export default class ResourceManager extends ManagerBase {
         });
       }
 
-      // Gather any containers or storage units in the room
-      const containers = this.room
-        .find(FIND_STRUCTURES, {
-          filter: { structureType: STRUCTURE_CONTAINER }
-        })
-        .map(c => c as StructureContainer);
-      const storageUnits = this.room
-        .find(FIND_MY_STRUCTURES, {
-          filter: { structureType: STRUCTURE_STORAGE }
-        })
-        .map(s => s as StructureStorage);
-
       this.memory = {
         sources: managedResources,
         containers: containers.map(c => c.id),
         storageUnits: storageUnits.map(s => s.id),
         harvestQueue: []
       };
+    } else {
+      // Refresh container and storage lists
+      this.memory.containers = containers.map(c => c.id);
+      this.memory.storageUnits = storageUnits.map(s => s.id);
     }
   }
 

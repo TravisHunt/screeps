@@ -18,6 +18,70 @@ export default class ManagedSource extends ManagedStation<Source> {
     };
   }
 
+  public findExpansionPositions(): RoomPosition[] {
+    const terrain = this.source.room.getTerrain();
+    const untracked = this.getUntrackedPositions();
+    const viable: RoomPosition[] = [];
+
+    // Scan terrain around each untracked position to determine if
+    // building a road on the position would make it walkable.
+    for (const pos of untracked) {
+      const hasRoad = pos
+        .lookFor(LOOK_STRUCTURES)
+        .filter(s => s.structureType === STRUCTURE_ROAD).length;
+
+      // If a build request for a road here was completed, or something messed
+      // up and this position wasn't tracked, make sure we track it moving
+      // forward.
+      if (hasRoad) {
+        this.positions.push({ x: pos.x, y: pos.y });
+        continue;
+      }
+
+      const adjacent = ManagedSource.getAdjacentPositions(
+        pos,
+        this.room.name,
+        false
+      );
+
+      for (const adj of adjacent) {
+        const code = terrain.get(adj.x, adj.y);
+        const validTerrain =
+          (code & TERRAIN_MASK_WALL) === 0 && (code & TERRAIN_MASK_LAVA) === 0;
+
+        if (validTerrain) {
+          viable.push(pos);
+          break;
+        }
+      }
+    }
+
+    return viable;
+  }
+
+  private getUntrackedPositions(): RoomPosition[] {
+    const adjacent = ManagedSource.getAdjacentPositions(
+      this.source.pos,
+      this.room.name
+    );
+    const tracked = this.positions.map(
+      p => new RoomPosition(p.x, p.y, this.room.name)
+    );
+
+    const untracked = adjacent.filter(adj => {
+      let isUntracked = true;
+      for (const t of tracked) {
+        if (t.isEqualTo(adj)) {
+          isUntracked = false;
+          break;
+        }
+      }
+      return isUntracked;
+    });
+
+    return untracked;
+  }
+
   private clean(): [number, number] {
     let corpseCount = 0;
     let finishedCount = 0;

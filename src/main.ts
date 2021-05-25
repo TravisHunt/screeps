@@ -20,6 +20,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   }
 
   // Init memory tables for various processes
+  if (!Memory.logs) Memory.logs = [];
   if (!Memory.roomState) Memory.roomState = {};
   if (!Memory.buildSchedules) Memory.buildSchedules = {};
   if (!Memory.resources) Memory.resources = {};

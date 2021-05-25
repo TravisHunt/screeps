@@ -2,6 +2,8 @@ import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import * as utils from "managers/resource/utils";
 import * as palette from "palette";
+import Build from "./build/Build";
+import BuildQueue from "./resource/BuildQueue";
 
 export default class BuildManager extends ManagerBase {
   public static readonly roleBuilder = "builder";
@@ -11,6 +13,8 @@ export default class BuildManager extends ManagerBase {
   public builders: Creep[];
   public repairmen: Creep[];
   private resourceManager: ResourceManager;
+  private currentBuild?: Build;
+  private buildQueue: BuildQueue;
 
   public constructor(
     room: Room,
@@ -38,6 +42,8 @@ export default class BuildManager extends ManagerBase {
 
     // Find build schedule in Memory. Create one if none found.
     this.initBuildSchedule();
+
+    this.buildQueue = new BuildQueue(this.schedule.buildQueue);
   }
 
   public get schedule(): BuildSchedule {
@@ -51,24 +57,16 @@ export default class BuildManager extends ManagerBase {
   private initBuildSchedule(): void {
     if (!this.schedule) {
       this.schedule = {
-        jobCounter: 0,
-        jobs: []
+        buildQueue: []
       };
     } else {
-      if (!this.schedule.jobCounter) this.schedule.jobCounter = 0;
-      if (!this.schedule.jobs) this.schedule.jobs = [];
+      if (!this.schedule.buildQueue) this.schedule.buildQueue = [];
     }
-  }
-
-  private getJob(jobId: number): BuildJob | undefined {
-    return this.schedule.jobs.find(j => j.id === jobId);
   }
 
   public run(): void {
     // TODO: handle multiple spawns?
     const spawn = this.room.find(FIND_MY_SPAWNS)[0];
-
-    // Queue job for source queue
 
     // Do we have the max amount of extensions?
     // TODO
@@ -82,13 +80,46 @@ export default class BuildManager extends ManagerBase {
     // Build road for source queue
     this.buildSourceQueueRoad(spawn);
 
-    // Clear out completed jobs
-    if (this.schedule.jobs)
-      this.schedule.jobs = this.schedule.jobs.filter(j => !j.complete);
+    // Queue any build jobs requested by the resource manager
+    const requests = this.resourceManager.requestBuilds();
+    // check if these requests have already been queued before adding
+    for (const req of requests) {
+      const buildMem = Build.createMemoryInstance(
+        req.type,
+        this.room.name,
+        req.positions
+      );
+
+      // Verify that we aren't currently working this build, and that this
+      // request is not in the build queue.
+      const isCurrent =
+        this.schedule.currentBuildMemory &&
+        this.schedule.currentBuildMemory.id === buildMem.id;
+
+      if (!isCurrent && !this.buildQueue.containsRequest(req)) {
+        req.positions.forEach(pos => {
+          this.room.createConstructionSite(pos.x, pos.y, STRUCTURE_ROAD);
+        });
+        this.buildQueue.enqueue(buildMem);
+      }
+    }
+
+    // Clear completed build. Stage next build.
+    if (
+      !this.schedule.currentBuildMemory ||
+      this.schedule.currentBuildMemory.complete
+    ) {
+      this.schedule.currentBuildMemory = undefined;
+      const next = this.buildQueue.dequeue();
+      if (next) this.schedule.currentBuildMemory = next;
+    }
+    if (this.schedule.currentBuildMemory) {
+      this.currentBuild = new Build(this.schedule.currentBuildMemory);
+    }
 
     // Spawn builder if we need one
     if (this.builders.length < this.builderMax && !spawn.spawning) {
-      if (this.schedule.highPriorityBuild || this.schedule.jobs.length) {
+      if (this.currentBuild) {
         BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);
       }
     }
@@ -100,19 +131,6 @@ export default class BuildManager extends ManagerBase {
 
     // Assign jobs
     this.builders.forEach(builder => {
-      // Clear completed job
-      if (builder.memory.jobId) {
-        const jobActive = this.schedule.jobs.find(
-          j => j.id === builder.memory.jobId
-        );
-        if (jobActive && jobActive.complete) delete builder.memory.jobId;
-      }
-
-      if (!builder.memory.jobId && this.schedule.jobs.length) {
-        // Assign to first available job
-        builder.memory.jobId = this.schedule.jobs[0].id;
-      }
-
       this.doYourJob(builder);
     });
 
@@ -161,9 +179,22 @@ export default class BuildManager extends ManagerBase {
 
     // TOOD: Check resourceManager for roads on harvest tiles.
     const managerRepair = this.resourceManager.getInNeedOfRepair().shift();
+    const storage =
+      this.room.storage &&
+      this.room.storage.hits < this.room.storage.hitsMax * 0.75
+        ? this.room.storage
+        : undefined;
+    const container = this.room
+      .find(FIND_STRUCTURES, {
+        filter: s =>
+          s.hits < s.hitsMax * 0.75 && s.structureType === STRUCTURE_CONTAINER
+      })
+      .shift();
 
     const target =
       managerRepair ||
+      storage ||
+      container ||
       this.room
         .find(FIND_STRUCTURES, {
           filter: object => object.hits < object.hitsMax
@@ -214,45 +245,26 @@ export default class BuildManager extends ManagerBase {
       return;
     }
 
-    if (
-      this.schedule.highPriorityBuild ||
-      creep.memory.jobId ||
-      creep.memory.buildTarget
-    ) {
+    if (this.currentBuild || creep.memory.buildTarget) {
       // Find the first construction site within the job
       let buildSite: ConstructionSite | null = null;
-      let job: BuildJob | undefined;
 
-      if (this.schedule.highPriorityBuild) {
-        buildSite = Game.getObjectById(this.schedule.highPriorityBuild);
+      if (this.currentBuild && !this.currentBuild.complete) {
+        if (this.currentBuild.sites.length) {
+          buildSite = this.currentBuild.sites[0];
+        } else {
+          // Build is complete if there are no sites left.
+          this.currentBuild.complete = true;
+        }
       } else if (creep.memory.buildTarget) {
         buildSite = Game.getObjectById(creep.memory.buildTarget);
-      } else if (creep.memory.jobId) {
-        job = this.getJob(creep.memory.jobId);
-        if (job) {
-          for (const pStr of job.pathStrings) {
-            const jobPath = Room.deserializePath(pStr);
-            for (const step of jobPath) {
-              const found = this.room.lookForAt(
-                LOOK_CONSTRUCTION_SITES,
-                step.x,
-                step.y
-              );
-              if (found.length) {
-                buildSite = found[0];
-                break;
-              }
-            }
-            if (buildSite) break;
-          }
-        }
       }
 
       if (buildSite) {
         const buildResponse = creep.build(buildSite);
         switch (creep.build(buildSite)) {
           case OK:
-            creep.say("🚧 build");
+            // creep.say("🚧 build");
             break;
           case ERR_NOT_IN_RANGE:
             creep.moveTo(buildSite, {
@@ -260,21 +272,18 @@ export default class BuildManager extends ManagerBase {
             });
             break;
           case ERR_INVALID_TARGET:
-            creep.say("ERR: INVALID TARGET");
-            if (this.schedule.highPriorityBuild)
-              delete this.schedule.highPriorityBuild;
-            else if (creep.memory.buildTarget) delete creep.memory.buildTarget;
-            else if (job) job.complete = true;
+            if (
+              creep.memory.buildTarget &&
+              creep.memory.buildTarget === buildSite.id
+            ) {
+              delete creep.memory.buildTarget;
+            }
             break;
           default:
             creep.say(`ERR: ${buildResponse}`);
         }
       } else {
-        creep.say("ERR: I HAVE NO SITE");
-        if (this.schedule.highPriorityBuild)
-          delete this.schedule.highPriorityBuild;
-        else if (creep.memory.buildTarget) delete creep.memory.buildTarget;
-        else if (job) job.complete = true;
+        creep.say("NO SITE!");
       }
     } else {
       // No job? Pick up an unassigned construction sites
@@ -311,77 +320,41 @@ export default class BuildManager extends ManagerBase {
     });
   }
 
-  private createBuildJobObj(
-    type: BuildType,
-    pathStrings: string[],
-    origin?: RoomPosition,
-    goal?: PathDestination
-  ): BuildJob {
-    const job: BuildJob = {
-      id: ++this.schedule.jobCounter,
-      type,
-      pathStrings,
-      complete: false,
-      origin,
-      goal
-    };
-
-    return job;
-  }
-
-  private createBuildJob(
-    type: BuildType,
-    pathStrings: string[],
-    origin?: RoomPosition,
-    goal?: PathDestination
-  ): BuildJob {
-    const job = this.createBuildJobObj(type, pathStrings, origin, goal);
-    this.schedule.jobs.push(job);
-    return job;
-  }
-
-  private createMultiRoadBuildJob(paths: PathStep[][]): BuildJob {
-    const pathStrings = paths.map(path => Room.serializePath(path));
-    const job = this.createBuildJob("road", pathStrings);
-
-    // Queue job's construction sites
-    paths
+  private buildMultipleRoads(paths: PathStep[][]): BuildMemory {
+    const steps = paths
       .reduce((acc, val) => acc.concat(val), [])
-      .forEach(step => {
-        this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
-      });
+      .map(step => new RoomPosition(step.x, step.y, this.room.name));
 
-    return job;
+    const memory = Build.createMemoryInstance("road", this.room.name, steps);
+    this.buildQueue.enqueue(memory);
+
+    // Schedule job's construction sites
+    steps.forEach(step => {
+      this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
+    });
+
+    return memory;
   }
 
   private buildRoadFromTo(
     from: RoomPosition,
     to: RoomPosition,
     opts?: FindPathOpts
-  ): BuildJob {
+  ): BuildMemory {
     // Find the best path from the origin to the destination
-    const path = this.room.findPath(from, to, opts);
-    const goal: PathDestination = {
-      x: to.x,
-      y: to.y,
-      range: opts && opts.range ? opts.range : 0,
-      roomName: this.room.name
-    };
+    const steps = this.room
+      .findPath(from, to, opts)
+      .map(s => new RoomPosition(s.x, s.y, this.room.name));
 
-    const job = this.createBuildJob(
-      "road",
-      [Room.serializePath(path)],
-      from,
-      goal
-    );
+    const memory = Build.createMemoryInstance("road", this.room.name, steps);
+    this.buildQueue.enqueue(memory);
 
-    // Queue job's construction sites
-    path.forEach(step => {
+    // Schedule job's construction sites
+    steps.forEach(step => {
       this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
     });
 
-    // Queue job
-    return job;
+    return memory;
   }
 
   private buildSourceQueueRoad(spawn: StructureSpawn): void {
@@ -424,7 +397,7 @@ export default class BuildManager extends ManagerBase {
         }
 
         // Add new job to this room's schedule
-        const job = this.createMultiRoadBuildJob(paths);
+        const job = this.buildMultipleRoads(paths);
 
         // Link new job to the room's state
         jobState.jobId = job.id;
@@ -435,15 +408,20 @@ export default class BuildManager extends ManagerBase {
         throw new Error("Job State Error: Job in progress without id.");
 
       // Job is in progress. Find job to see if it's done
-      const job = this.getJob(jobState.jobId);
-      if (!job) throw new Error("No job for road from spawn to sources");
-
-      // If complete, toggle state flags and wipe ref to job since it will
-      // be wiped from the schedule.
-      if (job.complete) {
-        jobState.inprogress = false;
-        jobState.complete = true;
-        delete jobState.jobId;
+      if (this.currentBuild && this.currentBuild.id === jobState.jobId) {
+        // If complete, toggle state flags and wipe ref to job since it will
+        // be wiped from the schedule.
+        if (this.currentBuild.complete) {
+          jobState.inprogress = false;
+          jobState.complete = true;
+          delete jobState.jobId;
+        }
+      } else {
+        // This build is not the current build. Let's make sure it's in the
+        // queue, since our state is in progress.
+        if (!this.buildQueue.containsWithId(jobState.jobId)) {
+          throw new Error("Source queue build state configuration error");
+        }
       }
     }
   }
@@ -466,32 +444,41 @@ export default class BuildManager extends ManagerBase {
       });
 
       // Add new job to this room's schedule
-      const job = this.createMultiRoadBuildJob(paths);
+      const buildMem = this.buildMultipleRoads(paths);
 
       // Link new job to the room's state
-      jobState.jobId = job.id;
+      jobState.jobId = buildMem.id;
       jobState.inprogress = true;
     } else {
       if (!jobState.jobId)
         throw new Error("Job State Error: Job in progress without id.");
 
       // Job is in progress. Find job to see if it's done
-      const job = this.getJob(jobState.jobId);
-      if (!job) throw new Error("No job for road from spawn to sources");
-
-      // If complete, toggle state flags and wipe ref to job since it will
-      // be wiped from the schedule.
-      if (job.complete) {
-        jobState.inprogress = false;
-        jobState.complete = true;
-        delete jobState.jobId;
+      if (this.currentBuild && this.currentBuild.id === jobState.jobId) {
+        // If complete, toggle state flags and wipe ref to job since it will
+        // be wiped from the schedule.
+        if (this.currentBuild.complete) {
+          jobState.inprogress = false;
+          jobState.complete = true;
+          delete jobState.jobId;
+        }
+      } else {
+        // This build is not the current build. Let's make sure it's in the
+        // queue, since our state is in progress.
+        if (!this.buildQueue.containsWithId(jobState.jobId)) {
+          throw new Error("Spawn to source build state configuration error");
+        }
       }
     }
   }
 
   private buildRoadSpawnToCtrl(spawn: StructureSpawn): void {
     const jobState = this.roomState.roadFromSpawnToCtrl;
-    if (!jobState.inprogress && !jobState.complete) {
+    if (!jobState)
+      throw new Error("Job State Not Configured: Road from spawn to ctrl.");
+    if (jobState.complete) return;
+
+    if (!jobState.inprogress) {
       if (!this.room.controller) throw new Error("Room has no controller");
 
       // Add a new job to this room's schedule
@@ -501,18 +488,25 @@ export default class BuildManager extends ManagerBase {
       // Link new job to the room's state
       jobState.jobId = job.id;
       jobState.inprogress = true;
-    } else if (jobState.inprogress && jobState.jobId) {
-      // This road has been started, so let's check if it's complete
-      const jobRoadSpawnToCtrl = this.getJob(jobState.jobId);
-      if (!jobRoadSpawnToCtrl)
-        throw new Error("No job for road from spawn to ctrl");
+    } else {
+      if (!jobState.jobId)
+        throw new Error("Job State Error: Job in progress without id.");
 
-      // If complete, toggle state flags and wipe ref to job since it will be wiped
-      // from the schedule.
-      if (jobRoadSpawnToCtrl.complete) {
-        jobState.inprogress = false;
-        jobState.complete = true;
-        delete jobState.jobId;
+      // Job is in progress. Find job to see if it's done
+      if (this.currentBuild && this.currentBuild.id === jobState.jobId) {
+        // If complete, toggle state flags and wipe ref to job since it will
+        // be wiped from the schedule.
+        if (this.currentBuild.complete) {
+          jobState.inprogress = false;
+          jobState.complete = true;
+          delete jobState.jobId;
+        }
+      } else {
+        // This build is not the current build. Let's make sure it's in the
+        // queue, since our state is in progress.
+        if (!this.buildQueue.containsWithId(jobState.jobId)) {
+          throw new Error("Spawn to ctrl build state configuration error");
+        }
       }
     }
   }

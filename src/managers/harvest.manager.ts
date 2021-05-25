@@ -80,7 +80,8 @@ export default class HarvestManager extends ManagerBase {
     if (!structure) {
       structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
         filter: s =>
-          s.structureType === STRUCTURE_CONTAINER &&
+          (s.structureType === STRUCTURE_CONTAINER ||
+            s.structureType === STRUCTURE_STORAGE) &&
           s.store.getFreeCapacity(RESOURCE_ENERGY)
       });
     }
@@ -94,22 +95,14 @@ export default class HarvestManager extends ManagerBase {
       }
     } else {
       // No where to store energy. Do we have a high priority build target?
-      if (this.schedule.highPriorityBuild) {
-        const target = Game.getObjectById(this.schedule.highPriorityBuild);
-        if (target && harvester.build(target) === ERR_NOT_IN_RANGE) {
-          harvester.moveTo(target, {
-            visualizePathStyle: { stroke: palette.PATH_COLOR_BUILD }
-          });
-        }
-      } else if (harvester.room.controller) {
-        if (
-          harvester.upgradeController(harvester.room.controller) ===
+      if (
+        harvester.room.controller &&
+        harvester.upgradeController(harvester.room.controller) ===
           ERR_NOT_IN_RANGE
-        ) {
-          harvester.moveTo(harvester.room.controller, {
-            visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE }
-          });
-        }
+      ) {
+        harvester.moveTo(harvester.room.controller, {
+          visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE }
+        });
       }
     }
   }

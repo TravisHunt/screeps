@@ -1,4 +1,5 @@
 interface Memory {
+  logs: string[];
   roomState: Record<string, RoomState>;
   buildSchedules: Record<string, BuildSchedule>;
   resources: Record<string, ResourceManagerMemory>;
@@ -19,46 +20,33 @@ interface RoomState {
   sourceQueueRoad: RoomBuildJobState;
 }
 
-type WithdrawUnionType = Ruin | Tombstone | Structure<StructureConstant>;
+type BuildType = "road" | "ext" | "container";
 
-type StructureHasStore =
-  | RoomObject
-  | Creep
-  | PowerCreep
-  | Ruin
-  | StructureStorage
-  | StructureTerminal
-  | StructureContainer
-  | StructureFactory
-  | Tombstone;
-
-type BuildSite = RoomPosition | RoomPosition[];
-type BuildType = "road" | "ext";
-
-interface PathDestination {
-  x: number;
-  y: number;
-  range: number;
-  roomName: string;
-}
-
-interface BuildJob {
+interface BuildMemory {
   id: number;
   type: BuildType;
-  pathStrings: string[];
+  roomName: string;
+  siteIds: Id<ConstructionSite>[];
+  positions: RoomPosition[];
   complete: boolean;
-  origin?: RoomPosition;
-  goal?: PathDestination;
+}
+
+interface BuildRequest {
+  type: BuildType;
+  positions: RoomPosition[];
 }
 
 interface BuildSchedule {
-  jobs: BuildJob[];
-  jobCounter: number;
-  highPriorityBuild?: Id<ConstructionSite>;
+  currentBuildMemory?: BuildMemory;
+  buildQueue: BuildMemory[];
 }
 
 interface RoomBuildJobState {
   inprogress: boolean;
   complete: boolean;
   jobId?: number;
+}
+
+interface HasPos {
+  pos: RoomPosition;
 }
