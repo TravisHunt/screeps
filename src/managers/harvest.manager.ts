@@ -38,11 +38,11 @@ export default class HarvestManager extends ManagerBase {
     this.spawnHarvesters(spawn);
 
     this.harvesters.forEach(harvester => {
-      this.work(harvester);
+      this.work(harvester, spawn);
     });
   }
 
-  private work(harvester: Creep) {
+  private work(harvester: Creep, spawn: StructureSpawn) {
     if (
       harvester.memory.harvesting &&
       harvester.store.getFreeCapacity(RESOURCE_ENERGY) === 0
@@ -53,6 +53,21 @@ export default class HarvestManager extends ManagerBase {
       !harvester.memory.harvesting &&
       harvester.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
+      // Should I renew?
+      const shouldRenew = harvester.ticksToLive && harvester.ticksToLive < 500;
+      const creepSize = harvester.body.length;
+      const creepCost = harvester.body
+        .map(part => BODYPART_COST[part.type])
+        .reduce((total, val) => total + val);
+      const renewCost = Math.ceil(creepCost / 2.5 / creepSize);
+
+      if (shouldRenew && spawn.store[RESOURCE_ENERGY] > renewCost) {
+        if (spawn.renewCreep(harvester) === ERR_NOT_IN_RANGE) {
+          harvester.moveTo(spawn);
+          return;
+        }
+      }
+
       harvester.memory.harvesting = true;
       harvester.say("🔄 harvest");
     }
@@ -94,7 +109,7 @@ export default class HarvestManager extends ManagerBase {
         });
       }
     } else {
-      // No where to store energy. Do we have a high priority build target?
+      // No where to store energy
       if (
         harvester.room.controller &&
         harvester.upgradeController(harvester.room.controller) ===

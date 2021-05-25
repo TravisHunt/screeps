@@ -136,12 +136,12 @@ export default class BuildManager extends ManagerBase {
 
     // Assign jobs
     this.builders.forEach(builder => {
-      this.doYourJob(builder);
+      this.doYourJob(builder, spawn);
     });
 
     // Put repairmen to work
     this.repairmen.forEach(repairman => {
-      this.repair(repairman);
+      this.repair(repairman, spawn);
     });
   }
 
@@ -150,12 +150,29 @@ export default class BuildManager extends ManagerBase {
    * @remarks TODO: Create a RepairManager
    * @param creep - Repairman
    */
-  private repair(creep: Creep): void {
+  private repair(creep: Creep, spawn: StructureSpawn): void {
     // Harvest if you have no more energy
     if (
       !creep.memory.harvesting &&
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
+      // Should I renew?
+      const shouldRenew = creep.ticksToLive && creep.ticksToLive < 500;
+      const creepSize = creep.body.length;
+      const creepCost = creep.body
+        .map(part => BODYPART_COST[part.type])
+        .reduce((total, val) => total + val);
+      const renewCost = Math.ceil(creepCost / 2.5 / creepSize);
+      console.log(
+        `Should renew: ${shouldRenew ? "YES" : "NO"}, Renew cost: ${renewCost}`
+      );
+      if (shouldRenew && spawn.store[RESOURCE_ENERGY] > renewCost) {
+        if (spawn.renewCreep(creep) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(spawn);
+          return;
+        }
+      }
+
       creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
@@ -217,7 +234,7 @@ export default class BuildManager extends ManagerBase {
    * Directs a creep to perform the build job
    * @param creep - Builder
    */
-  private doYourJob(creep: Creep): void {
+  private doYourJob(creep: Creep, spawn: StructureSpawn): void {
     // TODO: make sure the creep is capable of this job
 
     // Harvest if you have no more energy
@@ -225,6 +242,21 @@ export default class BuildManager extends ManagerBase {
       !creep.memory.harvesting &&
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
+      // Should I renew?
+      const shouldRenew = creep.ticksToLive && creep.ticksToLive < 500;
+      const creepSize = creep.body.length;
+      const creepCost = creep.body
+        .map(part => BODYPART_COST[part.type])
+        .reduce((total, val) => total + val);
+      const renewCost = Math.ceil(creepCost / 2.5 / creepSize);
+
+      if (shouldRenew && spawn.store[RESOURCE_ENERGY] > renewCost) {
+        if (spawn.renewCreep(creep) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(spawn);
+          return;
+        }
+      }
+
       creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
@@ -290,7 +322,7 @@ export default class BuildManager extends ManagerBase {
       // No job? Pick up an unassigned construction sites
       const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
       if (site) creep.memory.buildTarget = site.id;
-      else this.repair(creep);
+      else this.repair(creep, spawn);
     }
   }
 
