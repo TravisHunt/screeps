@@ -5,7 +5,7 @@ import ResourceManager from "managers/resource/resource.manager";
 import UpgradeManager from "managers/upgrade.manager";
 
 const BUILDER_MAX = 1;
-const REPAIRMAN_MAX = 1;
+const REPAIRMAN_MAX = 2;
 const UPGRADER_MAX = 1;
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
@@ -29,7 +29,8 @@ export const loop = ErrorMapper.wrapLoop(() => {
       Memory.roomState[room] = {
         roadFromSpawnToCtrl: { inprogress: false, complete: false },
         roadFromSpawnToEnergySources: { inprogress: false, complete: false },
-        sourceQueueRoad: { inprogress: false, complete: false }
+        sourceQueueRoad: { inprogress: false, complete: false },
+        outpostRoads: {}
       };
     } else {
       if (!Memory.roomState[room].roadFromSpawnToCtrl) {
@@ -50,6 +51,8 @@ export const loop = ErrorMapper.wrapLoop(() => {
           complete: false
         };
       }
+      if (!Memory.roomState[room].outpostRoads)
+        Memory.roomState[room].outpostRoads = {};
     }
   }
 

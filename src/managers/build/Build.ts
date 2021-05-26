@@ -84,10 +84,10 @@ export default class Build {
     }
 
     if (mem.siteIds.length !== this.positions.length) {
-      const log = `ERROR: Build ${mem.id} | ${this.positions.length} site \
-      locations and ${mem.siteIds.length} construction sites found.`;
-      Memory.logs.push(log);
-      console.log(log);
+      //       const log = `ERROR: Build ${mem.id} | ${this.positions.length} site \
+      // locations and ${mem.siteIds.length} construction sites found.`;
+      //       Memory.logs.push(log);
+      //       console.log(log);
     }
 
     // If construction sites have been built, they won't show up here, which

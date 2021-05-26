@@ -49,7 +49,14 @@ export default class ManagedSource extends ManagedStation<Source> {
         const validTerrain =
           (code & TERRAIN_MASK_WALL) === 0 && (code & TERRAIN_MASK_LAVA) === 0;
 
-        if (validTerrain) {
+        const adjIsTracked = this.positions.filter(
+          p => p.x === adj.x && p.y === adj.y
+        ).length;
+
+        // We avoid adding this position if the only adjacent walkable tile
+        // is already tracked to avoid walking collision.
+        // TODO: Implement anti-collision access to tucked positions?
+        if (validTerrain && !adjIsTracked) {
           viable.push(pos);
           break;
         }

@@ -18,6 +18,7 @@ interface RoomState {
   roadFromSpawnToCtrl: RoomBuildJobState;
   roadFromSpawnToEnergySources: RoomBuildJobState;
   sourceQueueRoad: RoomBuildJobState;
+  outpostRoads: Record<string, RoomBuildJobState>;
 }
 
 interface BuildMemory {

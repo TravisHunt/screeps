@@ -2,6 +2,7 @@ import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import * as utils from "managers/resource/utils";
 import * as palette from "palette";
+import * as constants from "screeps.constants";
 import Build from "./Build";
 import BuildQueue from "./BuildQueue";
 
@@ -76,14 +77,33 @@ export default class BuildManager extends ManagerBase {
     // Do we have the max amount of extensions?
     // TODO
 
-    // Build road from spawn to energy sources
-    this.buildRoadSpawnToEnergySources(spawn);
+    try {
+      // Build road from spawn to energy sources
+      this.buildRoadSpawnToEnergySources(spawn);
+    } catch (err) {
+      console.log(err);
+    }
 
-    // If we haven't started building a road from spawn to ctlr
-    this.buildRoadSpawnToCtrl(spawn);
+    try {
+      // If we haven't started building a road from spawn to ctlr
+      this.buildRoadSpawnToCtrl(spawn);
+    } catch (err) {
+      console.log(err);
+    }
 
-    // Build road for source queue
-    this.buildSourceQueueRoad(spawn);
+    try {
+      // Build road for source queue
+      this.buildSourceQueueRoad(spawn);
+    } catch (err) {
+      console.log(err);
+    }
+
+    try {
+      // Build roads to marked outposts
+      this.buildOutpostRoads(spawn);
+    } catch (err) {
+      console.log(err);
+    }
 
     // Queue any build jobs requested by the resource manager
     const requests = this.resourceManager.requestBuilds();
@@ -124,7 +144,8 @@ export default class BuildManager extends ManagerBase {
 
     // Spawn builder if we need one
     if (this.builders.length < this.builderMax && !spawn.spawning) {
-      if (this.currentBuild) {
+      const csiteCount = this.room.find(FIND_MY_CONSTRUCTION_SITES).length;
+      if (this.currentBuild || csiteCount > 0) {
         BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);
       }
     }
@@ -157,7 +178,8 @@ export default class BuildManager extends ManagerBase {
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
       // Should I renew?
-      const shouldRenew = creep.ticksToLive && creep.ticksToLive < 500;
+      const shouldRenew =
+        creep.ticksToLive && creep.ticksToLive < constants.RENEW_THRESHOLD;
       const creepSize = creep.body.length;
       const creepCost = creep.body
         .map(part => BODYPART_COST[part.type])
@@ -243,7 +265,8 @@ export default class BuildManager extends ManagerBase {
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
       // Should I renew?
-      const shouldRenew = creep.ticksToLive && creep.ticksToLive < 500;
+      const shouldRenew =
+        creep.ticksToLive && creep.ticksToLive < constants.RENEW_THRESHOLD;
       const creepSize = creep.body.length;
       const creepCost = creep.body
         .map(part => BODYPART_COST[part.type])
@@ -316,7 +339,9 @@ export default class BuildManager extends ManagerBase {
             creep.say(`ERR: ${buildResponse}`);
         }
       } else {
-        creep.say("NO SITE!");
+        const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
+        if (site) creep.memory.buildTarget = site.id;
+        else this.repair(creep, spawn);
       }
     } else {
       // No job? Pick up an unassigned construction sites
@@ -375,7 +400,8 @@ export default class BuildManager extends ManagerBase {
   private buildMultipleRoads(paths: PathStep[][]): BuildMemory {
     const steps = paths
       .reduce((acc, val) => acc.concat(val), [])
-      .map(step => new RoomPosition(step.x, step.y, this.room.name));
+      .map(step => new RoomPosition(step.x, step.y, this.room.name))
+      .filter(rp => rp.lookFor(LOOK_STRUCTURES).length === 0);
 
     const memory = Build.createMemoryInstance("road", this.room.name, steps);
     this.buildQueue.enqueue(memory);
@@ -403,9 +429,14 @@ export default class BuildManager extends ManagerBase {
     // Find the best path from the origin to the destination
     const steps = this.room
       .findPath(from, to, opts)
-      .map(s => new RoomPosition(s.x, s.y, this.room.name));
+      .map(s => new RoomPosition(s.x, s.y, this.room.name))
+      .filter(rp => rp.lookFor(LOOK_STRUCTURES).length === 0);
 
-    const memory = Build.createMemoryInstance("road", this.room.name, steps);
+    const memory = Build.createMemoryInstance(
+      STRUCTURE_ROAD,
+      this.room.name,
+      steps
+    );
     this.buildQueue.enqueue(memory);
 
     // Schedule job's construction sites
@@ -577,6 +608,57 @@ export default class BuildManager extends ManagerBase {
         // queue, since our state is in progress.
         if (!this.buildQueue.containsWithId(jobState.jobId)) {
           throw new Error("Spawn to ctrl build state configuration error");
+        }
+      }
+    }
+  }
+
+  private buildOutpostRoads(spawn: StructureSpawn): void {
+    const outpostFlags = this.room.find(FIND_FLAGS, {
+      filter: flag => {
+        return flag.name.startsWith("outpost_");
+      }
+    });
+
+    for (const outpost of outpostFlags) {
+      if (outpost.name in this.roomState.outpostRoads === false) {
+        this.roomState.outpostRoads[outpost.name] = {
+          inprogress: false,
+          complete: false
+        };
+      }
+
+      const state = this.roomState.outpostRoads[outpost.name];
+      if (state.complete) continue;
+
+      // Path has not yet been planned
+      if (!state.inprogress) {
+        const build = this.buildRoadFromTo(spawn.pos, outpost.pos, {
+          ignoreCreeps: true
+        });
+
+        // Link new build to the room's state
+        state.jobId = build.id;
+        state.inprogress = true;
+      } else {
+        if (!state.jobId)
+          throw new Error("Build State Error: Build in progress without id.");
+
+        // Build is in progress. Find build to see if it's done
+        if (this.currentBuild && this.currentBuild.id === state.jobId) {
+          // If complete, toggle state flags and wipe ref to job since it will
+          // be wiped from the schedule.
+          if (this.currentBuild.complete) {
+            state.inprogress = false;
+            state.complete = true;
+            delete state.jobId;
+          }
+        } else {
+          // This build is not the current build. Let's make sure it's in the
+          // queue, since our state is in progress.
+          if (!this.buildQueue.containsWithId(state.jobId)) {
+            // throw new Error("Outpost road build state configuration error");
+          }
         }
       }
     }

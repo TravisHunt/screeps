@@ -1,5 +1,6 @@
 import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
+import * as constants from "screeps.constants";
 import * as palette from "palette";
 
 export default class UpgradeManager extends ManagerBase {
@@ -48,7 +49,8 @@ export default class UpgradeManager extends ManagerBase {
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
       // Should I renew?
-      const shouldRenew = creep.ticksToLive && creep.ticksToLive < 500;
+      const shouldRenew =
+        creep.ticksToLive && creep.ticksToLive < constants.RENEW_THRESHOLD;
       const creepSize = creep.body.length;
       const creepCost = creep.body
         .map(part => BODYPART_COST[part.type])
