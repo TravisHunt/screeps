@@ -4,7 +4,6 @@ import HarvestManager from "managers/harvest.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import UpgradeManager from "managers/upgrade.manager";
 
-const HARVESTER_MAX = 3;
 const BUILDER_MAX = 1;
 const REPAIRMAN_MAX = 1;
 const UPGRADER_MAX = 1;
@@ -57,6 +56,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   const spawn1 = Game.spawns.Spawn1;
 
   const resourceManager = new ResourceManager(spawn1.room);
+  const harvesterMax = resourceManager.harvestPositionCount;
 
   // Visualize spawning
   if (spawn1.spawning) {
@@ -75,7 +75,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   // Build and start managers for this room
   const harvestManager = new HarvestManager(
     spawn1.room,
-    HARVESTER_MAX,
+    harvesterMax,
     resourceManager
   );
   const buildManager = new BuildManager(

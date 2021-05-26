@@ -50,6 +50,16 @@ export default class ResourceManager extends ManagerBase {
     Memory.resources[this.room.name] = memory;
   }
 
+  public get harvestPositionCount(): number {
+    let count = 0;
+
+    for (const src of this.sources) {
+      count += src.positions.length;
+    }
+
+    return count;
+  }
+
   private getAvailableHarvestPosition(): OccupiablePosition | undefined {
     for (const managed of this.sources) {
       const pos = managed.getAvailablePosition();
