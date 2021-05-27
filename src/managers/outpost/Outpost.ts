@@ -100,9 +100,14 @@ export default class Outpost extends ManagedLocation {
     // Request energy base on container level
     for (const container of this.containers) {
       const amount = container.store.getFreeCapacity(RESOURCE_ENERGY);
-      requests.push({ bucketId: container.id, type: RESOURCE_ENERGY, amount });
+      if (amount > 0) {
+        requests.push({
+          bucketId: container.id,
+          type: RESOURCE_ENERGY,
+          amount
+        });
+      }
     }
-
     return requests;
   }
 }
