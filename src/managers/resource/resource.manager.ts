@@ -46,6 +46,9 @@ export default class ResourceManager extends ManagerBase {
     this.deliveryQueue = new Queue<ResourceRequest>(this.memory.deliveryQueue);
 
     // gather couriers
+    this.memory.courierNames = this.memory.courierNames.filter(
+      name => name in Game.creeps
+    );
     this.couriers = this.memory.courierNames.map(name => Game.creeps[name]);
   }
 
