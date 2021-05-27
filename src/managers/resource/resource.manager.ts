@@ -10,18 +10,25 @@ import {
   isEnergyStructure,
   isStoreStructure
 } from "utils/typeGuards";
+import Queue from "utils/Queue";
+import XPARTS from "utils/XPARTS";
 
 export default class ResourceManager extends ManagerBase {
+  public static readonly roleCourier = "courier";
+  private courierMax: number;
   private sources: ManagedSource[] = [];
   private containers: StructureContainer[] = [];
   private storageUnits: StructureStorage[] = [];
   private harvestQueue: HarvestQueue;
+  private deliveryQueue: Queue<ResourceRequest>;
+  private couriers: Creep[] = [];
 
-  public constructor(room: Room) {
+  public constructor(room: Room, courierMax: number) {
     super(room);
 
     this.init();
 
+    this.courierMax = courierMax;
     this.sources = this.memory.sources.map(s => new ManagedSource(s));
 
     // const containers = this.memory.containers
@@ -33,7 +40,13 @@ export default class ResourceManager extends ManagerBase {
       id => Game.getObjectById(id) as StructureStorage
     );
 
-    this.harvestQueue = new HarvestQueue(this.memory.harvestQueue || []);
+    if (!this.memory.harvestQueue) this.memory.harvestQueue = [];
+    if (!this.memory.deliveryQueue) this.memory.deliveryQueue = [];
+    this.harvestQueue = new HarvestQueue(this.memory.harvestQueue);
+    this.deliveryQueue = new Queue<ResourceRequest>(this.memory.deliveryQueue);
+
+    // gather couriers
+    this.couriers = this.memory.courierNames.map(name => Game.creeps[name]);
   }
 
   /**
@@ -142,7 +155,8 @@ export default class ResourceManager extends ManagerBase {
       }
     }
 
-    // TODO: perform any necessary end-of-tick clean up
+    // TODO: I don't think this is actually necessary. Investigate if
+    // the queue instance properly saves to memory.
     // Save updated harvest queue to memory
     this.memory.harvestQueue = this.harvestQueue.queue;
 
@@ -159,6 +173,118 @@ export default class ResourceManager extends ManagerBase {
         visual.circle(pos.x, pos.y, { fill: color, radius: 0.5 });
       }
     }
+
+    // Assign queued contracts if we have any.
+    if (this.deliveryQueue.length) {
+      while (this.deliveryQueue.length > 0) {
+        const courier = this.getAvailableCourier();
+
+        if (!courier) {
+          // Can we spawn a new courier to meet demand?
+          if (this.couriers.length < this.courierMax) {
+            if (this.trySpawnCourier() === OK) {
+              console.log("Spawning Courier...");
+            }
+          }
+          break;
+        } else {
+          const contract = this.deliveryQueue.dequeue() as ResourceDeliveryContract;
+          courier.memory.contract = contract;
+        }
+      }
+    }
+
+    // Direct couriers
+    this.couriers
+      .filter(c => !c.spawning && c.memory.contract !== undefined)
+      .forEach(c => {
+        if (!c.memory.contract) return; // stupid type safety
+        const contract = c.memory.contract;
+
+        if (contract.delivered >= contract.amount) {
+          // Contract complete. Delete and return.
+          delete c.memory.contract;
+          return;
+        }
+
+        if (!c.memory.harvesting && c.store.getFreeCapacity(contract.type)) {
+          c.memory.harvesting = true;
+        }
+        if (c.memory.harvesting && c.store.getFreeCapacity() === 0) {
+          // Should I renew?
+          const shouldRenew =
+            c.ticksToLive && c.ticksToLive < constants.RENEW_THRESHOLD;
+          const cSize = c.body.length;
+          const cCost = c.body
+            .map(part => BODYPART_COST[part.type])
+            .reduce((total, val) => total + val);
+          const renewCost = Math.ceil(cCost / 2.5 / cSize);
+          console.log(
+            `Should renew: ${
+              shouldRenew ? "YES" : "NO"
+            }, Renew cost: ${renewCost}`
+          );
+          if (shouldRenew) {
+            const spawn = c.pos.findClosestByRange(FIND_MY_SPAWNS);
+            if (spawn && spawn.store[RESOURCE_ENERGY] > renewCost) {
+              if (spawn.renewCreep(c) === ERR_NOT_IN_RANGE) {
+                c.moveTo(spawn);
+                return;
+              }
+            }
+          }
+
+          c.memory.harvesting = false;
+        }
+
+        if (c.memory.harvesting) {
+          const withdrawAmt = Math.min(
+            contract.amount,
+            c.store.getFreeCapacity(contract.type)
+          );
+
+          this.withdraw(c, contract.type, { amount: withdrawAmt });
+        } else {
+          const bucket = Game.getObjectById(contract.bucketId);
+
+          if (!bucket) {
+            // Assume the bucket no longer exists. Close contract.
+            delete c.memory.contract;
+            return;
+          }
+
+          // TODO: Check available bucket space
+          // const freeBucketSpace = bucket.store.getCapacity() - bucket.store[contract.type];
+          // if (!freeBucketSpace) {
+          //   delete c.memory.contract;
+          //   return;
+          // }
+          const transferAmt = Math.min(
+            contract.amount - contract.delivered,
+            c.store.getUsedCapacity(contract.type)
+          );
+          const transferRes = c.transfer(bucket, contract.type, transferAmt);
+
+          if (transferRes === OK) {
+            contract.delivered += transferAmt;
+            c.say(`${contract.delivered}/${contract.amount}`);
+            if (contract.delivered >= contract.amount) {
+              // Contract complete. Close contract.
+              delete c.memory.contract;
+            }
+          } else if (transferRes === ERR_FULL) {
+            // Contract complete. Close contract.
+            delete c.memory.contract;
+          } else if (transferRes === ERR_NOT_IN_RANGE) {
+            c.moveTo(bucket.pos);
+          }
+        }
+      });
+
+    // TODO: I don't think this is actually necessary. Investigate if
+    // the queue instance properly saves to memory.
+    // Save updated delivery queue to memory
+    this.memory.deliveryQueue = this.deliveryQueue.queue;
   }
 
   /**
@@ -215,6 +341,46 @@ export default class ResourceManager extends ManagerBase {
     }
 
     return requests;
+  }
+
+  public acceptResourceRequests(requests: ResourceRequest[]): void {
+    for (const req of requests) {
+      // See if a request to fill this bucket with this resource has already
+      // been made before queueing the request.
+      const match = this.deliveryQueue.queue.find(
+        x => x.bucketId === req.bucketId && x.type === req.type
+      );
+      if (!match) {
+        console.log(`Request queued: ${JSON.stringify(req)}`);
+        this.deliveryQueue.enqueue(req);
+      }
+    }
+  }
+
+  private getAvailableCourier(): Creep | undefined {
+    return this.couriers.find(c => !c.spawning && !c.memory.contract);
+  }
+
+  private trySpawnCourier(): ScreepsReturnCode {
+    // Find a spawn in this room that isn't currently spawning
+    const spawns = this.room.find(FIND_MY_SPAWNS, {
+      filter: s => !s.spawning
+    });
+
+    if (!spawns.length) return ERR_BUSY;
+
+    const parts = XPARTS([CARRY, 4], [MOVE, 4]);
+    const name = `Courier${Game.time}`;
+    const res = spawns[0].spawnCreep(parts, name, {
+      memory: {
+        role: ResourceManager.roleCourier,
+        origin: this.room.name
+      }
+    });
+
+    if (res === OK) this.memory.courierNames.push(name);
+
+    return res;
   }
 
   /**
@@ -388,12 +554,16 @@ export default class ResourceManager extends ManagerBase {
         sources: managedResources,
         containers: containers.map(c => c.id),
         storageUnits: storageUnits.map(s => s.id),
-        harvestQueue: []
+        harvestQueue: [],
+        deliveryQueue: [],
+        courierNames: []
       };
     } else {
       // Refresh container and storage lists
       this.memory.containers = containers.map(c => c.id);
       this.memory.storageUnits = storageUnits.map(s => s.id);
+
+      if (!this.memory.courierNames) this.memory.courierNames = [];
     }
   }
 

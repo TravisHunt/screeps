@@ -87,8 +87,7 @@ export default class HarvestManager extends ManagerBase {
       filter: s => {
         return (
           (s.structureType === STRUCTURE_SPAWN ||
-            s.structureType === STRUCTURE_EXTENSION ||
-            s.structureType === STRUCTURE_TOWER) &&
+            s.structureType === STRUCTURE_EXTENSION) &&
           s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
         );
       }
@@ -98,8 +97,7 @@ export default class HarvestManager extends ManagerBase {
     if (!structure) {
       structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
         filter: s =>
-          (s.structureType === STRUCTURE_CONTAINER ||
-            s.structureType === STRUCTURE_STORAGE) &&
+          s.structureType === STRUCTURE_STORAGE &&
           s.store.getFreeCapacity(RESOURCE_ENERGY)
       });
     }

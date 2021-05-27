@@ -3,10 +3,12 @@ import BuildManager from "managers/build/build.manager";
 import HarvestManager from "managers/harvest.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import UpgradeManager from "managers/upgrade.manager";
+import OutpostManager from "managers/outpost/OutpostManager";
 
 const BUILDER_MAX = 1;
 const REPAIRMAN_MAX = 2;
 const UPGRADER_MAX = 1;
+const COURIER_MAX = 1;
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
@@ -23,6 +25,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   if (!Memory.roomState) Memory.roomState = {};
   if (!Memory.buildSchedules) Memory.buildSchedules = {};
   if (!Memory.resources) Memory.resources = {};
+  if (!Memory.outposts) Memory.outposts = {};
 
   for (const room in Game.rooms) {
     if (room in Memory.roomState === false) {
@@ -54,12 +57,13 @@ export const loop = ErrorMapper.wrapLoop(() => {
       if (!Memory.roomState[room].outpostRoads)
         Memory.roomState[room].outpostRoads = {};
     }
+
+    if (room in Memory.outposts === false) {
+      Memory.outposts[room] = { outposts: [] };
+    }
   }
 
   const spawn1 = Game.spawns.Spawn1;
-
-  const resourceManager = new ResourceManager(spawn1.room);
-  const harvesterMax = resourceManager.harvestPositionCount;
 
   // Visualize spawning
   if (spawn1.spawning) {
@@ -76,6 +80,15 @@ export const loop = ErrorMapper.wrapLoop(() => {
   }
 
   // Build and start managers for this room
+  const resourceManager = new ResourceManager(spawn1.room, COURIER_MAX);
+  const harvesterMax = resourceManager.harvestPositionCount;
+
+  const outpostManager = new OutpostManager(
+    Memory.outposts[spawn1.room.name],
+    spawn1.room,
+    resourceManager
+  );
+
   const harvestManager = new HarvestManager(
     spawn1.room,
     harvesterMax,
@@ -96,6 +109,9 @@ export const loop = ErrorMapper.wrapLoop(() => {
   harvestManager.run();
   buildManager.run();
   upgradeManager.run();
+
+  // Manage outposts
+  outpostManager.run();
 
   // Manage resource access
   resourceManager.run();

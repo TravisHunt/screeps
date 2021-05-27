@@ -34,6 +34,8 @@ interface ResourceManagerMemory {
   containers: Id<StructureContainer>[];
   storageUnits: Id<StructureStorage>[];
   harvestQueue: [Id<Creep>, number][];
+  deliveryQueue: ResourceRequest[];
+  courierNames: string[];
 }
 
 interface StationInsights {

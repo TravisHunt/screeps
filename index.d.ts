@@ -3,6 +3,7 @@ interface Memory {
   roomState: Record<string, RoomState>;
   buildSchedules: Record<string, BuildSchedule>;
   resources: Record<string, ResourceManagerMemory>;
+  outposts: Record<string, OutpostManagerMemory>;
 }
 
 interface CreepMemory {
@@ -12,6 +13,8 @@ interface CreepMemory {
   harvesting?: boolean;
   jobId?: number;
   buildTarget?: Id<ConstructionSite>;
+  origin?: string;
+  contract?: ResourceDeliveryContract;
 }
 
 interface RoomState {
