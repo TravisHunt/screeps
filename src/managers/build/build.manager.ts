@@ -369,7 +369,7 @@ export default class BuildManager extends ManagerBase {
         : [WORK, CARRY, MOVE];
 
     const res = spawn.spawnCreep(parts, name, {
-      memory: { role: this.roleBuilder, building: false }
+      memory: { role: this.roleBuilder }
     });
 
     if (res === OK) {
@@ -388,7 +388,7 @@ export default class BuildManager extends ManagerBase {
     const name = `Repairman${Game.time}`;
     console.log("Spawning new repairman: " + name);
     spawn.spawnCreep([WORK, CARRY, MOVE], name, {
-      memory: { role: this.roleRepairman, building: false }
+      memory: { role: this.roleRepairman }
     });
   }
 

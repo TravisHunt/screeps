@@ -191,11 +191,20 @@ export default class ResourceManager extends ManagerBase {
           }
           break;
         } else {
-          const contract = this.deliveryQueue.dequeue() as ResourceDeliveryContract;
-          courier.memory.contract = contract;
+          const contract = this.deliveryQueue.dequeue();
+          if (contract) {
+            courier.memory.contract = contract as ResourceDeliveryContract;
+            // TODO: initialize delivered value in constructor
+            courier.memory.contract.delivered = 0;
+          }
         }
       }
     }
+
+    // TODO: I don't think this is actually necessary. Investigate if
+    // the queue instance properly saves to memory.
+    // Save updated delivery queue to memory
+    this.memory.deliveryQueue = this.deliveryQueue.queue;
 
     // Couriers without contracts return home and unload
     this.couriers
@@ -298,11 +307,6 @@ export default class ResourceManager extends ManagerBase {
           }
         }
       });
-
-    // TODO: I don't think this is actually necessary. Investigate if
-    // the queue instance properly saves to memory.
-    // Save updated delivery queue to memory
-    this.memory.deliveryQueue = this.deliveryQueue.queue;
   }
 
   /**
@@ -368,7 +372,13 @@ export default class ResourceManager extends ManagerBase {
       const match = this.deliveryQueue.queue.find(
         x => x.bucketId === req.bucketId && x.type === req.type
       );
-      if (!match) {
+      const working = this.couriers.find(
+        c =>
+          c.memory.contract &&
+          c.memory.contract.bucketId === req.bucketId &&
+          c.memory.contract.type === req.type
+      );
+      if (!match && !working) {
         console.log(`Request queued: ${JSON.stringify(req)}`);
         this.deliveryQueue.enqueue(req);
       }

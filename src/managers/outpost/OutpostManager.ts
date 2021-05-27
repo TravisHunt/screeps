@@ -40,8 +40,8 @@ export default class OutpostManager extends ManagerBase {
       }
     }
 
-    // Rescan outpost area for newly built/destroyed structures
-    this.outposts.forEach(o => o.rescan());
+    // Let each outpost do it's work
+    this.outposts.forEach(o => o.run());
 
     // Submit resource requests from outposts to resource manager
     const requests = this.outposts

@@ -6,9 +6,11 @@ interface OutpostMemory {
   name: string;
   range: number;
   base: RoomPosition;
+  spawnName: string | undefined;
   containerIds: Id<StructureContainer>[];
   rampartIds: Id<StructureRampart>[];
   towerIds: Id<StructureTower>[];
+  attendantNames: string[];
 }
 
 interface ResourceRequest {

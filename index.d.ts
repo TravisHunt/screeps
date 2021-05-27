@@ -8,9 +8,8 @@ interface Memory {
 
 interface CreepMemory {
   role: string;
-  upgrading?: boolean;
-  building?: boolean;
   harvesting?: boolean;
+  renewing?: boolean;
   jobId?: number;
   buildTarget?: Id<ConstructionSite>;
   origin?: string;

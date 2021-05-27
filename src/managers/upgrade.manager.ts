@@ -100,7 +100,7 @@ export default class UpgradeManager extends ManagerBase {
       energyCapacity >= 550
         ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]
         : [WORK, CARRY, MOVE];
-    const opts = { memory: { role: this.role, upgrading: false } };
+    const opts = { memory: { role: this.role } };
     if (spawn.spawnCreep(parts, name, opts) === OK)
       console.log("Spawning new upgrader: " + name);
   }
