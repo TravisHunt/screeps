@@ -197,7 +197,22 @@ export default class ResourceManager extends ManagerBase {
       }
     }
 
-    // Direct couriers
+    // Couriers without contracts return home and unload
+    this.couriers
+      .filter(c => !c.spawning && c.memory.contract === undefined)
+      .forEach(c => {
+        if (this.room.storage) {
+          for (const type in c.store) {
+            const res = c.transfer(this.room.storage, type as ResourceConstant);
+            if (res === ERR_NOT_IN_RANGE) {
+              c.moveTo(this.room.storage);
+              break;
+            }
+          }
+        }
+      });
+
+    // Direct couriers with contracts
     this.couriers
       .filter(c => !c.spawning && c.memory.contract !== undefined)
       .forEach(c => {
