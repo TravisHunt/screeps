@@ -143,7 +143,11 @@ export default class BuildManager extends ManagerBase {
     }
 
     // Spawn builder if we need one
-    if (this.builders.length < this.builderMax && !spawn.spawning) {
+    if (
+      this.currentBuild &&
+      this.builders.length < this.builderMax &&
+      !spawn.spawning
+    ) {
       const csiteCount = this.room.find(FIND_MY_CONSTRUCTION_SITES).length;
       if (this.currentBuild || csiteCount > 0) {
         BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);

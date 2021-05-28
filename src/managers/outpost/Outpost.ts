@@ -123,6 +123,13 @@ export default class Outpost extends ManagedLocation {
     Outpost.fillWithGameObjects(this.ramparts, this.rampartIds);
     Outpost.fillWithGameObjects(this.towers, this.towerIds);
 
+    // Clear dead ids
+    // TODO: Should the outpost track positions of these objects so that
+    // it can schedule rebuilds?
+    this.memory.containerIds = this.containers.map(c => c.id);
+    this.memory.rampartIds = this.ramparts.map(r => r.id);
+    this.memory.towerIds = this.towers.map(t => t.id);
+
     // Clear dead names
     this.memory.attendantNames = this.attendantNames.filter(
       name => name in Game.creeps
@@ -206,7 +213,9 @@ export default class Outpost extends ManagedLocation {
       });
 
     // Direct towers
-    const hostiles = this.lookWithinPerimeter(LOOK_CREEPS).map(x => x.creep);
+    const hostiles = this.lookWithinPerimeter(LOOK_CREEPS)
+      .map(x => x.creep)
+      .filter(c => c.owner.username !== USERNAME);
 
     if (hostiles.length) {
       const target = hostiles.sort((a, b) => a.hits - b.hits).shift();
@@ -315,5 +324,86 @@ export default class Outpost extends ManagedLocation {
       }
     }
     return requests;
+  }
+
+  public static drawOverlayFor(outpost: Outpost): void {
+    const charsPerTiles = 5;
+    const tileOffset = 3;
+    const smallFont = "0.3 Courier New";
+    const visual = new RoomVisual(outpost.base.roomName);
+    const topleftX = outpost.perimeter.x.min;
+    const topleftY = outpost.perimeter.y.min;
+    const width = outpost.perimeter.x.max - topleftX;
+    const height = outpost.perimeter.y.max - topleftY;
+
+    const scoreColor: (score: number) => "green" | "yellow" | "red" = score =>
+      score > 0.75 ? "green" : score > 0.4 ? "yellow" : "red";
+
+    visual.rect(topleftX, topleftY, width, height, {
+      fill: "transparent",
+      stroke: "white",
+      lineStyle: "dashed"
+    });
+
+    const info: [string, TextStyle | undefined][][] = [];
+
+    // Overlay header with outpost name
+    info.push([[outpost.name, { align: "left", font: "bold 1 Courier New" }]]);
+
+    outpost.towers.forEach(t => {
+      const energy = t.store[RESOURCE_ENERGY];
+      const energyCapacity = t.store.getCapacity(RESOURCE_ENERGY);
+      const energyColor = scoreColor(energy / energyCapacity);
+      const hitsColor = scoreColor(t.hits / t.hitsMax);
+
+      info.push([
+        [`Tower (${t.pos.x},${t.pos.y}):`, { align: "left", font: smallFont }],
+        [
+          `Energy: ${energy}/${energyCapacity}`,
+          { align: "left", font: smallFont, color: energyColor }
+        ],
+        [
+          `Hits: ${t.hits}/${t.hitsMax}`,
+          { align: "left", font: smallFont, color: hitsColor }
+        ]
+      ]);
+    });
+
+    outpost.attendants.forEach(a => {
+      const hitsColor = scoreColor(a.hits / a.hitsMax);
+
+      info.push([
+        [`${a.name}:`, { align: "left", font: smallFont }],
+        [
+          `Hits: ${a.hits}/${a.hitsMax}`,
+          { align: "left", font: smallFont, color: hitsColor }
+        ]
+      ]);
+    });
+
+    outpost.containers.forEach((c, i) => {
+      const energy = c.store[RESOURCE_ENERGY];
+      const energyCapacity = c.store.getCapacity(RESOURCE_ENERGY);
+      const energyColor = scoreColor(energy / energyCapacity);
+
+      info.push([
+        [`Container ${i + 1}:`, { align: "left", font: smallFont }],
+        [
+          `Energy: ${energy}/${energyCapacity}`,
+          { align: "left", font: smallFont, color: energyColor }
+        ]
+      ]);
+    });
+
+    const x = topleftX;
+    for (let i = 1; i <= info.length; i++) {
+      const set = info[i - 1];
+      let tileBuffer = 0;
+      for (const [str, style] of set) {
+        const tilespan = Math.floor((str.length + tileOffset) / charsPerTiles);
+        visual.text(str, x + tileBuffer, topleftY + i, style);
+        tileBuffer += tilespan;
+      }
+    }
   }
 }

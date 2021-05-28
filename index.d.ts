@@ -51,3 +51,8 @@ interface RoomBuildJobState {
 interface HasPos {
   pos: RoomPosition;
 }
+
+interface Coordinate {
+  x: number;
+  y: number;
+}

@@ -52,18 +52,8 @@ export default class OutpostManager extends ManagerBase {
 
     // Draw outpost debug overlay for each outpost
     if (debug) {
-      const visual = new RoomVisual(this.room.name);
       for (const outpost of this.outposts) {
-        const topleftX = outpost.perimeter.x.min;
-        const topleftY = outpost.perimeter.y.min;
-        const width = outpost.perimeter.x.max - topleftX;
-        const height = outpost.perimeter.y.max - topleftY;
-
-        visual.rect(topleftX, topleftY, width, height, {
-          fill: "transparent",
-          stroke: "white",
-          lineStyle: "dashed"
-        });
+        Outpost.drawOverlayFor(outpost);
       }
     }
   }
