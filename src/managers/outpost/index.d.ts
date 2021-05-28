@@ -5,6 +5,7 @@ interface OutpostManagerMemory {
 interface OutpostMemory {
   name: string;
   range: number;
+  perimeter: Perimeter;
   base: RoomPosition;
   spawnName: string | undefined;
   containerIds: Id<StructureContainer>[];
@@ -21,4 +22,9 @@ interface ResourceRequest {
 
 interface ResourceDeliveryContract extends ResourceRequest {
   delivered: number;
+}
+
+interface Perimeter {
+  x: { min: number; max: number };
+  y: { min: number; max: number };
 }

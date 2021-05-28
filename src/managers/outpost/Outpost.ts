@@ -1,6 +1,10 @@
 import ManagedLocation from "ManagedLocation";
-import { RENEW_THRESHOLD } from "screeps.constants";
+import { RENEW_THRESHOLD, USERNAME } from "screeps.constants";
 import XPARTS from "utils/XPARTS";
+
+type LookPerimeterArray<
+  T extends keyof AllLookAtTypes
+> = LookForAtAreaResultArray<AllLookAtTypes[T], T>;
 
 export default class Outpost extends ManagedLocation {
   public static readonly roleAttendant = "attendant";
@@ -13,6 +17,7 @@ export default class Outpost extends ManagedLocation {
   public ramparts: StructureRampart[] = [];
   public towers: StructureTower[] = [];
   public attendants: Creep[] = [];
+  public perimeter: Perimeter;
   private spawnName: string | undefined;
   private containerIds: Id<StructureContainer>[];
   private rampartIds: Id<StructureRampart>[];
@@ -25,7 +30,11 @@ export default class Outpost extends ManagedLocation {
     ) as OutpostMemory;
   }
 
-  public static createMemory(flag: Flag, range: number): OutpostMemory {
+  public static createMemory(
+    flag: Flag,
+    range: number,
+    perimeter?: Perimeter
+  ): OutpostMemory {
     const name = flag.name;
     const base = flag.pos;
 
@@ -55,9 +64,15 @@ export default class Outpost extends ManagedLocation {
       })
       .map(creep => creep.name);
 
+    const perimeterByRange: Perimeter = {
+      x: { min: base.x - range, max: base.x + range },
+      y: { min: base.y - range, max: base.y - range }
+    };
+
     const memory: OutpostMemory = {
       name,
       range,
+      perimeter: perimeter ? perimeter : perimeterByRange,
       base,
       spawnName: spawn ? spawn.name : undefined,
       containerIds,
@@ -73,11 +88,25 @@ export default class Outpost extends ManagedLocation {
     return new Outpost(mem);
   }
 
+  public lookWithinPerimeter<T extends keyof AllLookAtTypes>(
+    look: T
+  ): LookPerimeterArray<T> {
+    return Game.rooms[this.base.roomName].lookForAtArea(
+      look,
+      this.perimeter.y.min,
+      this.perimeter.x.min,
+      this.perimeter.y.max,
+      this.perimeter.x.max,
+      true
+    );
+  }
+
   public constructor(mem: OutpostMemory) {
     super();
     this.name = mem.name;
     this.range = mem.range;
     this.spawnName = mem.spawnName;
+    this.perimeter = mem.perimeter;
     this.base = new RoomPosition(mem.base.x, mem.base.y, mem.base.roomName);
 
     this.containerIds = mem.containerIds || [];
@@ -177,22 +206,38 @@ export default class Outpost extends ManagedLocation {
       });
 
     // Direct towers
-    const hostiles = this.base.findInRange(FIND_HOSTILE_CREEPS, this.range);
+    const hostiles = this.lookWithinPerimeter(LOOK_CREEPS).map(x => x.creep);
+
     if (hostiles.length) {
       const target = hostiles.sort((a, b) => a.hits - b.hits).shift();
       if (target) this.towers.forEach(t => t.attack(target));
     } else {
-      // TODO: heal friendlies
-      // TODO: repair structures
-      // Repair ramparts
-      const outpostEnergyCapacity = this.containers
-        .map(c => c.store.getCapacity())
-        .reduce((acc, val) => (acc += val));
-      const availableEnergy = this.containers
-        .map(c => c.store[RESOURCE_ENERGY])
-        .reduce((acc, val) => (acc += val));
-      const conserve = availableEnergy < outpostEnergyCapacity * 0.5;
-      if (!conserve) {
+      let towerAction: "heal" | "repair" | undefined;
+      let conserveEnergy = false;
+
+      const friendlies = this.lookWithinPerimeter(LOOK_CREEPS)
+        .map(x => x.creep)
+        .filter(c => c.owner.username === USERNAME && c.hits < c.hitsMax)
+        .sort((a, b) => a.hits - b.hits);
+
+      if (friendlies.length) towerAction = "heal";
+
+      if (!towerAction) {
+        const outpostEnergyCapacity = this.containers
+          .map(c => c.store.getCapacity())
+          .reduce((acc, val) => (acc += val));
+        const availableEnergy = this.containers
+          .map(c => c.store[RESOURCE_ENERGY])
+          .reduce((acc, val) => (acc += val));
+
+        conserveEnergy = availableEnergy < outpostEnergyCapacity * 0.5;
+        if (!conserveEnergy) towerAction = "repair";
+      }
+
+      if (towerAction === "heal") {
+        const toHeal = friendlies.shift();
+        if (toHeal) this.towers.forEach(t => t.heal(toHeal));
+      } else if (towerAction === "repair") {
         const rampart = this.ramparts.sort((a, b) => a.hits - b.hits).shift();
         if (rampart) this.towers.forEach(t => t.repair(rampart));
       }
@@ -202,7 +247,10 @@ export default class Outpost extends ManagedLocation {
   public rescan(): void {
     // Scan for spawn
     if (!this.spawn) {
-      const spawn = this.base.findInRange(FIND_MY_SPAWNS, this.range).shift();
+      const spawn = this.lookWithinPerimeter(LOOK_STRUCTURES)
+        .filter(x => x.structure.structureType === STRUCTURE_SPAWN)
+        .map(x => x.structure as StructureSpawn)
+        .shift();
       if (spawn) {
         this.memory.spawnName = spawn.name;
         this.spawnName = spawn.name;
@@ -257,7 +305,7 @@ export default class Outpost extends ManagedLocation {
     for (const container of this.containers) {
       const max = container.store.getCapacity();
       const used = container.store.getUsedCapacity(RESOURCE_ENERGY);
-      console.log(`Amount: ${used}, Max: ${max}`);
+
       if (used < max * 0.5) {
         requests.push({
           bucketId: container.id,
