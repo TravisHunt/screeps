@@ -77,6 +77,25 @@ export default class BuildManager extends ManagerBase {
     // Do we have the max amount of extensions?
     // TODO
 
+    // Clear completed build. Stage next build.
+    if (
+      !this.schedule.currentBuildMemory ||
+      this.schedule.currentBuildMemory.complete
+    ) {
+      this.schedule.currentBuildMemory = undefined;
+      const next = this.buildQueue.dequeue();
+      if (next) this.schedule.currentBuildMemory = next;
+    }
+    if (this.schedule.currentBuildMemory) {
+      this.currentBuild = new Build(this.schedule.currentBuildMemory);
+    }
+
+    try {
+      this.spawnAdjacentWalkways(spawn);
+    } catch (err) {
+      console.log(err);
+    }
+
     try {
       // Build road from spawn to energy sources
       this.buildRoadSpawnToEnergySources(spawn);
@@ -127,19 +146,6 @@ export default class BuildManager extends ManagerBase {
         });
         this.buildQueue.enqueue(buildMem);
       }
-    }
-
-    // Clear completed build. Stage next build.
-    if (
-      !this.schedule.currentBuildMemory ||
-      this.schedule.currentBuildMemory.complete
-    ) {
-      this.schedule.currentBuildMemory = undefined;
-      const next = this.buildQueue.dequeue();
-      if (next) this.schedule.currentBuildMemory = next;
-    }
-    if (this.schedule.currentBuildMemory) {
-      this.currentBuild = new Build(this.schedule.currentBuildMemory);
     }
 
     // Spawn builder if we need one
@@ -268,6 +274,14 @@ export default class BuildManager extends ManagerBase {
       !creep.memory.harvesting &&
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
+      // If there is no current build or build target, get recycled
+      if (!this.currentBuild && !creep.memory.buildTarget) {
+        if (spawn.recycleCreep(creep) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(spawn);
+        }
+        return;
+      }
+
       // Should I renew?
       const shouldRenew =
         creep.ticksToLive && creep.ticksToLive < constants.RENEW_THRESHOLD;
@@ -305,7 +319,10 @@ export default class BuildManager extends ManagerBase {
       return;
     }
 
+    // TODO: move type to declaration file
+    type BuildTarget = "current" | "personal";
     if (this.currentBuild || creep.memory.buildTarget) {
+      let targetType: BuildTarget = "current";
       // Find the first construction site within the job
       let buildSite: ConstructionSite | null = null;
 
@@ -317,6 +334,7 @@ export default class BuildManager extends ManagerBase {
           this.currentBuild.complete = true;
         }
       } else if (creep.memory.buildTarget) {
+        targetType = "personal";
         buildSite = Game.getObjectById(creep.memory.buildTarget);
       }
 
@@ -332,10 +350,9 @@ export default class BuildManager extends ManagerBase {
             });
             break;
           case ERR_INVALID_TARGET:
-            if (
-              creep.memory.buildTarget &&
-              creep.memory.buildTarget === buildSite.id
-            ) {
+            if (targetType === "current" && this.currentBuild) {
+              this.currentBuild.complete = true;
+            } else {
               delete creep.memory.buildTarget;
             }
             break;
@@ -413,6 +430,28 @@ export default class BuildManager extends ManagerBase {
     // Schedule job's construction sites
     steps.forEach(step => {
       this.room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
+    });
+
+    return memory;
+  }
+
+  /**
+   * Queues a build to construct structures of the given type at the given
+   * room positions.
+   * @param type - Type of structure to be built
+   * @param positions - Coordinates of construction sites
+   * @returns Memory object for building plans
+   */
+  private buildTypeAtPositions(
+    type: BuildableStructureConstant,
+    positions: RoomPosition[]
+  ): BuildMemory {
+    const memory = Build.createMemoryInstance(type, this.room.name, positions);
+    this.buildQueue.enqueue(memory);
+
+    // Schedule construction sites
+    positions.forEach(pos => {
+      this.room.createConstructionSite(pos.x, pos.y, type);
     });
 
     return memory;
@@ -519,6 +558,79 @@ export default class BuildManager extends ManagerBase {
         // queue, since our state is in progress.
         if (!this.buildQueue.containsWithId(jobState.jobId)) {
           throw new Error("Source queue build state configuration error");
+        }
+      }
+    }
+  }
+
+  private spawnAdjacentWalkways(spawn: StructureSpawn): void {
+    const jobState = this.roomState.spawnAdjacentWalkways;
+    if (!jobState)
+      throw new Error("Job State Not Configured: Spawn Adjacent Walkways.");
+    if (jobState.complete) return;
+
+    // Road hasn't been planned
+    if (!jobState.inprogress) {
+      const T = 3;
+      const sx = spawn.pos.x;
+      const sy = spawn.pos.y;
+      const rname = spawn.room.name;
+
+      const positions: RoomPosition[] = [];
+
+      // Positions on X-axis
+      for (let dx = 1; dx <= T; dx++) {
+        positions.push(new RoomPosition(sx - dx, sy, rname));
+        positions.push(new RoomPosition(sx + dx, sy, rname));
+      }
+      // Positions on Y-axis
+      for (let dy = 1; dy <= T; dy++) {
+        positions.push(new RoomPosition(sx, sy - dy, rname));
+        positions.push(new RoomPosition(sx, sy + dy, rname));
+      }
+      // Positions on diagonals
+      for (let dx = 1, dy = 1; dx <= T && dy <= T; dx++, dy++) {
+        positions.push(new RoomPosition(sx + dx, sy - dy, rname));
+        positions.push(new RoomPosition(sx + dx, sy + dy, rname));
+        positions.push(new RoomPosition(sx - dx, sy + dy, rname));
+        positions.push(new RoomPosition(sx - dx, sy - dy, rname));
+      }
+
+      // We only want positions without structures and are not walls
+      const terrain = this.room.getTerrain();
+      const viable = positions.filter(
+        p =>
+          p.lookFor(LOOK_STRUCTURES).length === 0 &&
+          terrain.get(p.x, p.y) !== TERRAIN_MASK_WALL
+      );
+
+      // Queue build
+      const buildMem = this.buildTypeAtPositions(STRUCTURE_ROAD, viable);
+
+      // Link new build to room state
+      jobState.jobId = buildMem.id;
+      jobState.inprogress = true;
+    } else {
+      if (!jobState.jobId)
+        throw new Error("Job State Error: Job in progress without id.");
+
+      // Job is in progress. Find job to see if it's done.
+      if (this.currentBuild) {
+        // Is this job currently being worked?
+        if (this.currentBuild.id === jobState.jobId) {
+          // If complete, toggle state flags and wipe ref to job since it will
+          // be wiped from the schedule.
+          if (this.currentBuild.complete) {
+            jobState.inprogress = false;
+            jobState.complete = true;
+            delete jobState.jobId;
+          }
+        }
+      } else {
+        // If there is no current build scheduled and we've reached this point,
+        // something may have gone wrong. Check if this job is in the queue.
+        if (!this.buildQueue.containsWithId(jobState.jobId)) {
+          throw new Error("Spawn adjacent roads build state config error");
         }
       }
     }

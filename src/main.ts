@@ -30,12 +30,19 @@ export const loop = ErrorMapper.wrapLoop(() => {
   for (const room in Game.rooms) {
     if (room in Memory.roomState === false) {
       Memory.roomState[room] = {
+        spawnAdjacentWalkways: { inprogress: false, complete: false },
         roadFromSpawnToCtrl: { inprogress: false, complete: false },
         roadFromSpawnToEnergySources: { inprogress: false, complete: false },
         sourceQueueRoad: { inprogress: false, complete: false },
         outpostRoads: {}
       };
     } else {
+      if (!Memory.roomState[room].spawnAdjacentWalkways) {
+        Memory.roomState[room].spawnAdjacentWalkways = {
+          inprogress: false,
+          complete: false
+        };
+      }
       if (!Memory.roomState[room].roadFromSpawnToCtrl) {
         Memory.roomState[room].roadFromSpawnToCtrl = {
           inprogress: false,

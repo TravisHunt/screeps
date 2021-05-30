@@ -17,6 +17,7 @@ interface CreepMemory {
 }
 
 interface RoomState {
+  spawnAdjacentWalkways: RoomBuildJobState;
   roadFromSpawnToCtrl: RoomBuildJobState;
   roadFromSpawnToEnergySources: RoomBuildJobState;
   sourceQueueRoad: RoomBuildJobState;

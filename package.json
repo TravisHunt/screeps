@@ -8,6 +8,8 @@
   "scripts": {
     "lint": "eslint \"src/**/*.ts\"",
     "build": "rollup -c",
+    "push-steam-main": "rollup -c rollup.config.steam.js --environment DEST:steamMain",
+    "push-steam-test": "rollup -c rollup.config.steam.js --environment DEST:steamTest",
     "push-main": "rollup -c --environment DEST:main",
     "push-test": "rollup -c --environment DEST:test",
     "push-pserver": "rollup -c --environment DEST:pserver",
