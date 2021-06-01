@@ -65,6 +65,43 @@ export default abstract class ManagedStation<Type extends RoomObject> {
     return undefined;
   }
 
+  public static createMemoryObj<Type>(
+    roomName: string,
+    stationId: Id<Type>,
+    positions: RoomPosition[]
+  ): ManagedStationMemory<Type> {
+    const mem: ManagedStationMemory<Type> = {
+      roomName,
+      stationId,
+      positions
+    };
+
+    return mem;
+  }
+
+  public static getOccupiablePositions(
+    pos: RoomPosition,
+    roomName: string
+  ): RoomPosition[] {
+    const terrain = Game.rooms[roomName].getTerrain();
+    const positions = ManagedStation.getAdjacentPositions(pos, roomName).filter(
+      p => {
+        const code = terrain.get(p.x, p.y);
+        const hasRoad = p
+          .lookFor(LOOK_STRUCTURES)
+          .filter(s => s.structureType === STRUCTURE_ROAD).length;
+        const validPos =
+          hasRoad ||
+          ((code & TERRAIN_MASK_WALL) === 0 &&
+            (code & TERRAIN_MASK_LAVA) === 0);
+
+        return validPos;
+      }
+    );
+
+    return positions;
+  }
+
   /**
    * Gets all positions adjacent to this room object.
    * @returns List of RoomPositions adjacent to the managed room object.

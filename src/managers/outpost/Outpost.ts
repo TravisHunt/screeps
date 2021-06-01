@@ -326,8 +326,8 @@ export default class Outpost extends ManagedLocation {
     Outpost.fillWithGameObjects(this.walls, this.wallIds);
   }
 
-  public requestResources(): ResourceRequest[] {
-    const requests: ResourceRequest[] = [];
+  public requestResources(): ResourceRequestFromBucket[] {
+    const requests: ResourceRequestFromBucket[] = [];
 
     // Request energy base on container level
     for (const container of this.containers) {

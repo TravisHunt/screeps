@@ -4,6 +4,7 @@ interface Memory {
   buildSchedules: Record<string, BuildSchedule>;
   resources: Record<string, ResourceManagerMemory>;
   outposts: Record<string, OutpostManagerMemory>;
+  rooms: Record<string, RoomMemory>;
 }
 
 interface CreepMemory {
@@ -16,12 +17,15 @@ interface CreepMemory {
   contract?: ResourceDeliveryContract;
 }
 
-interface RoomState {
-  spawnAdjacentWalkways: RoomBuildJobState;
-  roadFromSpawnToCtrl: RoomBuildJobState;
-  roadFromSpawnToEnergySources: RoomBuildJobState;
-  sourceQueueRoad: RoomBuildJobState;
-  outpostRoads: Record<string, RoomBuildJobState>;
+interface BuildTracking {
+  buildQueue: BuildMemory[];
+  currentBuild?: BuildMemory;
+}
+
+interface ResourceTracking {
+  harvestQueue: [Id<Creep>, number][];
+  deliveryQueue: ResourceRequestFromBucket[];
+  courierNames: string[];
 }
 
 interface BuildMemory {
@@ -58,5 +62,6 @@ interface Coordinate {
   y: number;
 }
 
-type LookPerimeterArray<T extends keyof AllLookAtTypes> =
-  LookForAtAreaResultArray<AllLookAtTypes[T], T>;
+type LookPerimeterArray<
+  T extends keyof AllLookAtTypes
+> = LookForAtAreaResultArray<AllLookAtTypes[T], T>;

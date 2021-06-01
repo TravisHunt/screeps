@@ -4,6 +4,7 @@ import HarvestManager from "managers/harvest.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import UpgradeManager from "managers/upgrade.manager";
 import OutpostManager from "managers/outpost/OutpostManager";
+import RoomManager from "managers/room/RoomManager";
 
 const BUILDER_MAX = 1;
 const REPAIRMAN_MAX = 2;
@@ -27,7 +28,11 @@ export const loop = ErrorMapper.wrapLoop(() => {
   if (!Memory.resources) Memory.resources = {};
   if (!Memory.outposts) Memory.outposts = {};
 
+  const roomManagers: RoomManager[] = [];
+
   for (const room in Game.rooms) {
+    roomManagers.push(new RoomManager(room));
+
     if (room in Memory.roomState === false) {
       Memory.roomState[room] = {
         spawnAdjacentWalkways: { inprogress: false, complete: false },

@@ -20,7 +20,7 @@ export default class ResourceManager extends ManagerBase {
   private containers: StructureContainer[] = [];
   private storageUnits: StructureStorage[] = [];
   private harvestQueue: HarvestQueue;
-  private deliveryQueue: Queue<ResourceRequest>;
+  private deliveryQueue: Queue<ResourceRequestFromBucket>;
   private couriers: Creep[] = [];
 
   public constructor(room: Room, courierMax: number) {
@@ -43,7 +43,9 @@ export default class ResourceManager extends ManagerBase {
     if (!this.memory.harvestQueue) this.memory.harvestQueue = [];
     if (!this.memory.deliveryQueue) this.memory.deliveryQueue = [];
     this.harvestQueue = new HarvestQueue(this.memory.harvestQueue);
-    this.deliveryQueue = new Queue<ResourceRequest>(this.memory.deliveryQueue);
+    this.deliveryQueue = new Queue<ResourceRequestFromBucket>(
+      this.memory.deliveryQueue
+    );
 
     // gather couriers
     this.memory.courierNames = this.memory.courierNames.filter(
@@ -134,19 +136,11 @@ export default class ResourceManager extends ManagerBase {
         // TODO: Find best available position based on creep's position
         const harvestPos = this.getAvailableHarvestPosition();
         if (harvestPos) {
-          // Create RoomPosition instance so we can generate a path string.
-          const pos = new RoomPosition(
-            harvestPos.x,
-            harvestPos.y,
-            this.room.name
-          );
-
           harvestPos.occuiped = {
             creepId: harvestRequest[0],
             requested: harvestRequest[1],
             start: creep.store.getUsedCapacity(RESOURCE_ENERGY),
-            progress: 0,
-            path: Room.serializePath(creep.pos.findPathTo(pos))
+            progress: 0
           };
 
           assignmentsComplete++;
@@ -365,7 +359,7 @@ export default class ResourceManager extends ManagerBase {
     return requests;
   }
 
-  public acceptResourceRequests(requests: ResourceRequest[]): void {
+  public acceptResourceRequests(requests: ResourceRequestFromBucket[]): void {
     for (const req of requests) {
       // See if a request to fill this bucket with this resource has already
       // been made before queueing the request.

@@ -1,5 +1,5 @@
 export default abstract class ManagedLocation {
-  public abstract requestResources(): ResourceRequest[];
+  public abstract requestResources(): ResourceRequestFromBucket[];
 
   protected static fillWithGameObjects<Type>(
     list: Type[],

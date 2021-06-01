@@ -15,13 +15,13 @@ interface OutpostMemory {
   attendantNames: string[];
 }
 
-interface ResourceRequest {
+interface ResourceRequestFromBucket {
   bucketId: Id<AnyStoreStructure>;
   type: ResourceConstant;
   amount: number;
 }
 
-interface ResourceDeliveryContract extends ResourceRequest {
+interface ResourceDeliveryContract extends ResourceRequestFromBucket {
   delivered: number;
 }
 

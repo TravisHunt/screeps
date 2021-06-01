@@ -26,7 +26,6 @@ interface HarvestJob {
   requested: number;
   start: number;
   progress: number;
-  path: string;
 }
 
 interface ResourceManagerMemory {
@@ -34,7 +33,7 @@ interface ResourceManagerMemory {
   containers: Id<StructureContainer>[];
   storageUnits: Id<StructureStorage>[];
   harvestQueue: [Id<Creep>, number][];
-  deliveryQueue: ResourceRequest[];
+  deliveryQueue: ResourceRequestFromBucket[];
   courierNames: string[];
 }
 
