@@ -149,15 +149,13 @@ export default class BuildManager extends ManagerBase {
     }
 
     // Spawn builder if we need one
+    const csites = this.room.find(FIND_MY_CONSTRUCTION_SITES);
     if (
-      this.currentBuild &&
+      (this.currentBuild || csites.length > 0) &&
       this.builders.length < this.builderMax &&
       !spawn.spawning
     ) {
-      const csiteCount = this.room.find(FIND_MY_CONSTRUCTION_SITES).length;
-      if (this.currentBuild || csiteCount > 0) {
-        BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);
-      }
+      BuildManager.createBuilder(spawn, this.room.energyCapacityAvailable);
     }
 
     // Spawn repairman if we need one
@@ -167,7 +165,7 @@ export default class BuildManager extends ManagerBase {
 
     // Assign jobs
     this.builders.forEach(builder => {
-      this.doYourJob(builder, spawn);
+      this.doYourJob(builder, spawn, csites);
     });
 
     // Put repairmen to work
@@ -266,7 +264,11 @@ export default class BuildManager extends ManagerBase {
    * Directs a creep to perform the build job
    * @param creep - Builder
    */
-  private doYourJob(creep: Creep, spawn: StructureSpawn): void {
+  private doYourJob(
+    creep: Creep,
+    spawn: StructureSpawn,
+    csites: ConstructionSite[]
+  ): void {
     // TODO: make sure the creep is capable of this job
 
     // Harvest if you have no more energy
@@ -275,7 +277,7 @@ export default class BuildManager extends ManagerBase {
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
       // If there is no current build or build target, get recycled
-      if (!this.currentBuild && !creep.memory.buildTarget) {
+      if (!this.currentBuild && !csites.length) {
         if (spawn.recycleCreep(creep) === ERR_NOT_IN_RANGE) {
           creep.moveTo(spawn);
         }
@@ -319,23 +321,26 @@ export default class BuildManager extends ManagerBase {
       return;
     }
 
-    // TODO: move type to declaration file
-    type BuildTarget = "current" | "personal";
-    if (this.currentBuild || creep.memory.buildTarget) {
-      let targetType: BuildTarget = "current";
+    const targetType =
+      this.currentBuild && !this.currentBuild.complete
+        ? "current"
+        : csites.length > 0
+        ? "manual"
+        : "none";
+
+    if (targetType === "current" || targetType === "manual") {
       // Find the first construction site within the job
       let buildSite: ConstructionSite | null = null;
 
-      if (this.currentBuild && !this.currentBuild.complete) {
+      if (targetType === "current" && this.currentBuild) {
         if (this.currentBuild.sites.length) {
           buildSite = this.currentBuild.sites[0];
         } else {
           // Build is complete if there are no sites left.
           this.currentBuild.complete = true;
         }
-      } else if (creep.memory.buildTarget) {
-        targetType = "personal";
-        buildSite = Game.getObjectById(creep.memory.buildTarget);
+      } else if (targetType === "manual") {
+        buildSite = Game.getObjectById(csites[0].id);
       }
 
       if (buildSite) {
@@ -352,23 +357,16 @@ export default class BuildManager extends ManagerBase {
           case ERR_INVALID_TARGET:
             if (targetType === "current" && this.currentBuild) {
               this.currentBuild.complete = true;
-            } else {
-              delete creep.memory.buildTarget;
             }
             break;
           default:
             creep.say(`ERR: ${buildResponse}`);
         }
       } else {
-        const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
-        if (site) creep.memory.buildTarget = site.id;
-        else this.repair(creep, spawn);
+        this.repair(creep, spawn);
       }
     } else {
-      // No job? Pick up an unassigned construction sites
-      const site = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
-      if (site) creep.memory.buildTarget = site.id;
-      else this.repair(creep, spawn);
+      this.repair(creep, spawn);
     }
   }
 

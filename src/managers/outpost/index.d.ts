@@ -11,6 +11,7 @@ interface OutpostMemory {
   containerIds: Id<StructureContainer>[];
   rampartIds: Id<StructureRampart>[];
   towerIds: Id<StructureTower>[];
+  wallIds: Id<StructureWall>[];
   attendantNames: string[];
 }
 

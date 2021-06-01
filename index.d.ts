@@ -57,3 +57,6 @@ interface Coordinate {
   x: number;
   y: number;
 }
+
+type LookPerimeterArray<T extends keyof AllLookAtTypes> =
+  LookForAtAreaResultArray<AllLookAtTypes[T], T>;

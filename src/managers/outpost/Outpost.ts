@@ -1,11 +1,6 @@
 import ManagedLocation from "ManagedLocation";
 import { RENEW_THRESHOLD, USERNAME } from "screeps.constants";
 import XPARTS from "utils/XPARTS";
-
-type LookPerimeterArray<
-  T extends keyof AllLookAtTypes
-> = LookForAtAreaResultArray<AllLookAtTypes[T], T>;
-
 export default class Outpost extends ManagedLocation {
   public static readonly roleAttendant = "attendant";
   public static readonly attendantMax = 1;
@@ -16,12 +11,14 @@ export default class Outpost extends ManagedLocation {
   public containers: StructureContainer[] = [];
   public ramparts: StructureRampart[] = [];
   public towers: StructureTower[] = [];
+  public walls: StructureWall[] = [];
   public attendants: Creep[] = [];
   public perimeter: Perimeter;
   private spawnName: string | undefined;
   private containerIds: Id<StructureContainer>[];
   private rampartIds: Id<StructureRampart>[];
   private towerIds: Id<StructureTower>[];
+  private wallIds: Id<StructureWall>[];
   private attendantNames: string[];
 
   public get memory(): OutpostMemory {
@@ -38,46 +35,52 @@ export default class Outpost extends ManagedLocation {
     const name = flag.name;
     const base = flag.pos;
 
+    // If no perimeter is provided, create one using the provided range.
+    perimeter = perimeter || {
+      x: { min: base.x - range, max: base.x + range },
+      y: { min: base.y - range, max: base.y - range }
+    };
+
     const spawn = base.findInRange(FIND_MY_SPAWNS, range).shift();
+    const structures = Outpost.lookWithinPerimeter(
+      LOOK_STRUCTURES,
+      base.roomName,
+      perimeter
+    ).map(x => x.structure);
 
-    const containerIds = Outpost.getIdsForObjectsInRange<StructureContainer>(
-      base,
-      range,
-      STRUCTURE_CONTAINER
-    );
+    const containerIds = structures
+      .filter(s => s.structureType === STRUCTURE_CONTAINER)
+      .map(c => c.id as Id<StructureContainer>);
 
-    const rampartIds = Outpost.getIdsForObjectsInRange<StructureRampart>(
-      base,
-      range,
-      STRUCTURE_RAMPART
-    );
+    const rampartIds = structures
+      .filter(s => s.structureType === STRUCTURE_RAMPART)
+      .map(r => r.id as Id<StructureRampart>);
 
-    const towerIds = Outpost.getIdsForObjectsInRange<StructureTower>(
-      base,
-      range,
-      STRUCTURE_TOWER
-    );
+    const towerIds = structures
+      .filter(s => s.structureType === STRUCTURE_TOWER)
+      .map(t => t.id as Id<StructureTower>);
 
+    const wallIds = structures
+      .filter(s => s.structureType === STRUCTURE_WALL)
+      .map(t => t.id as Id<StructureWall>);
+
+    // TODO: Find attendents within perimeter
     const attendantNames = base
       .findInRange(FIND_MY_CREEPS, range, {
         filter: (creep: Creep) => creep.memory.role === Outpost.roleAttendant
       })
       .map(creep => creep.name);
 
-    const perimeterByRange: Perimeter = {
-      x: { min: base.x - range, max: base.x + range },
-      y: { min: base.y - range, max: base.y - range }
-    };
-
     const memory: OutpostMemory = {
       name,
       range,
-      perimeter: perimeter ? perimeter : perimeterByRange,
+      perimeter,
       base,
       spawnName: spawn ? spawn.name : undefined,
       containerIds,
       rampartIds,
       towerIds,
+      wallIds,
       attendantNames
     };
 
@@ -86,19 +89,6 @@ export default class Outpost extends ManagedLocation {
 
   public static getInstance(mem: OutpostMemory): Outpost {
     return new Outpost(mem);
-  }
-
-  public lookWithinPerimeter<T extends keyof AllLookAtTypes>(
-    look: T
-  ): LookPerimeterArray<T> {
-    return Game.rooms[this.base.roomName].lookForAtArea(
-      look,
-      this.perimeter.y.min,
-      this.perimeter.x.min,
-      this.perimeter.y.max,
-      this.perimeter.x.max,
-      true
-    );
   }
 
   public constructor(mem: OutpostMemory) {
@@ -112,6 +102,7 @@ export default class Outpost extends ManagedLocation {
     this.containerIds = mem.containerIds || [];
     this.rampartIds = mem.rampartIds || [];
     this.towerIds = mem.towerIds || [];
+    this.wallIds = mem.wallIds || [];
     this.attendantNames = mem.attendantNames || [];
 
     if (this.spawnName && Game.spawns[this.spawnName]) {
@@ -122,6 +113,7 @@ export default class Outpost extends ManagedLocation {
     Outpost.fillWithGameObjects(this.containers, this.containerIds);
     Outpost.fillWithGameObjects(this.ramparts, this.rampartIds);
     Outpost.fillWithGameObjects(this.towers, this.towerIds);
+    Outpost.fillWithGameObjects(this.walls, this.wallIds);
 
     // Clear dead ids
     // TODO: Should the outpost track positions of these objects so that
@@ -129,6 +121,7 @@ export default class Outpost extends ManagedLocation {
     this.memory.containerIds = this.containers.map(c => c.id);
     this.memory.rampartIds = this.ramparts.map(r => r.id);
     this.memory.towerIds = this.towers.map(t => t.id);
+    this.memory.wallIds = this.walls.map(w => w.id);
 
     // Clear dead names
     this.memory.attendantNames = this.attendantNames.filter(
@@ -213,7 +206,11 @@ export default class Outpost extends ManagedLocation {
       });
 
     // Direct towers
-    const hostiles = this.lookWithinPerimeter(LOOK_CREEPS)
+    const hostiles = Outpost.lookWithinPerimeter(
+      LOOK_CREEPS,
+      this.base.roomName,
+      this.perimeter
+    )
       .map(x => x.creep)
       .filter(c => c.owner.username !== USERNAME);
 
@@ -224,7 +221,11 @@ export default class Outpost extends ManagedLocation {
       let towerAction: "heal" | "repair" | undefined;
       let conserveEnergy = false;
 
-      const friendlies = this.lookWithinPerimeter(LOOK_CREEPS)
+      const friendlies = Outpost.lookWithinPerimeter(
+        LOOK_CREEPS,
+        this.base.roomName,
+        this.perimeter
+      )
         .map(x => x.creep)
         .filter(c => c.owner.username === USERNAME && c.hits < c.hitsMax)
         .sort((a, b) => a.hits - b.hits);
@@ -247,19 +248,36 @@ export default class Outpost extends ManagedLocation {
         const toHeal = friendlies.shift();
         if (toHeal) this.towers.forEach(t => t.heal(toHeal));
       } else if (towerAction === "repair") {
-        const rampart = this.ramparts.sort((a, b) => a.hits - b.hits).shift();
-        if (rampart) this.towers.forEach(t => t.repair(rampart));
+        const rampart = this.ramparts
+          .sort((a, b) => a.hits - b.hits)
+          .filter(r => r.hits < r.hitsMax)
+          .shift();
+        if (rampart) {
+          this.towers.forEach(t => t.repair(rampart));
+        } else {
+          const wall = this.walls.sort((a, b) => a.hits - b.hits).shift();
+
+          if (wall) {
+            this.towers.forEach(t => t.repair(wall));
+          }
+        }
       }
     }
   }
 
   public rescan(): void {
+    const structures = Outpost.lookWithinPerimeter(
+      LOOK_STRUCTURES,
+      this.base.roomName,
+      this.perimeter
+    ).map(x => x.structure);
+
     // Scan for spawn
+    // TODO: Update with new spawn if a spawn outside perimeter was used.
     if (!this.spawn) {
-      const spawn = this.lookWithinPerimeter(LOOK_STRUCTURES)
-        .filter(x => x.structure.structureType === STRUCTURE_SPAWN)
-        .map(x => x.structure as StructureSpawn)
-        .shift();
+      const spawn = structures
+        .filter(x => x.structureType === STRUCTURE_SPAWN)
+        .shift() as StructureSpawn;
       if (spawn) {
         this.memory.spawnName = spawn.name;
         this.spawnName = spawn.name;
@@ -277,34 +295,35 @@ export default class Outpost extends ManagedLocation {
 
     // Scan for a container if we don't have at least one
     if (this.containerIds.length < 1) {
-      this.containerIds = Outpost.getIdsForObjectsInRange<StructureContainer>(
-        this.base,
-        this.range,
-        STRUCTURE_CONTAINER
-      );
+      this.containerIds = structures
+        .filter(s => s.structureType === STRUCTURE_CONTAINER)
+        .map(c => c.id as Id<StructureContainer>);
       this.memory.containerIds = this.containerIds;
       Outpost.fillWithGameObjects(this.containers, this.containerIds);
     }
 
     // Always scan for updated ramparts
-    this.rampartIds = Outpost.getIdsForObjectsInRange<StructureRampart>(
-      this.base,
-      this.range,
-      STRUCTURE_RAMPART
-    );
+    this.rampartIds = structures
+      .filter(s => s.structureType === STRUCTURE_RAMPART)
+      .map(c => c.id as Id<StructureRampart>);
     this.memory.rampartIds = this.rampartIds;
     Outpost.fillWithGameObjects(this.ramparts, this.rampartIds);
 
     // Scan for a tower if we don't have at least one
     if (this.towerIds.length < 1) {
-      this.towerIds = Outpost.getIdsForObjectsInRange<StructureTower>(
-        this.base,
-        this.range,
-        STRUCTURE_TOWER
-      );
+      this.towerIds = structures
+        .filter(s => s.structureType === STRUCTURE_TOWER)
+        .map(c => c.id as Id<StructureTower>);
       this.memory.towerIds = this.towerIds;
       Outpost.fillWithGameObjects(this.towers, this.towerIds);
     }
+
+    // Always scan for updated walls
+    this.wallIds = structures
+      .filter(s => s.structureType === STRUCTURE_WALL)
+      .map(c => c.id as Id<StructureWall>);
+    this.memory.wallIds = this.wallIds;
+    Outpost.fillWithGameObjects(this.walls, this.wallIds);
   }
 
   public requestResources(): ResourceRequest[] {

@@ -24,4 +24,19 @@ export default abstract class ManagedLocation {
 
     return objectIds;
   }
+
+  public static lookWithinPerimeter<T extends keyof AllLookAtTypes>(
+    look: T,
+    roomName: string,
+    perimeter: Perimeter
+  ): LookPerimeterArray<T> {
+    return Game.rooms[roomName].lookForAtArea(
+      look,
+      perimeter.y.min,
+      perimeter.x.min,
+      perimeter.y.max,
+      perimeter.x.max,
+      true
+    );
+  }
 }
