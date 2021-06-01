@@ -2,6 +2,7 @@ import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import * as constants from "screeps.constants";
 import * as palette from "palette";
+import XPARTS from "utils/XPARTS";
 
 export default class UpgradeManager extends ManagerBase {
   public static readonly role = "upgrader";
@@ -97,8 +98,10 @@ export default class UpgradeManager extends ManagerBase {
   public static create(spawn: StructureSpawn, energyCapacity: number): void {
     const name = `Upgrader${Game.time}`;
     const parts =
-      energyCapacity >= 550
-        ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]
+      energyCapacity >= 1250
+        ? XPARTS([WORK, 3], [CARRY, 8], [MOVE, 11])
+        : energyCapacity >= 550
+        ? XPARTS([WORK, 2], [CARRY, 3], [MOVE, 4])
         : [WORK, CARRY, MOVE];
     const opts = { memory: { role: this.role } };
     if (spawn.spawnCreep(parts, name, opts) === OK)
