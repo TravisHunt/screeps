@@ -8,7 +8,7 @@ import RoomManager from "managers/room/RoomManager";
 
 const BUILDER_MAX = 1;
 const REPAIRMAN_MAX = 2;
-const UPGRADER_MAX = 3;
+const UPGRADER_MAX = 2;
 const COURIER_MAX = 1;
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change

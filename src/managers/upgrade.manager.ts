@@ -1,7 +1,8 @@
 import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
-import * as constants from "screeps.constants";
 import * as palette from "palette";
+import XPARTS from "utils/XPARTS";
+import { RENEW_THRESHOLD } from "screeps.constants";
 
 export default class UpgradeManager extends ManagerBase {
   public static readonly role = "upgrader";
@@ -42,28 +43,29 @@ export default class UpgradeManager extends ManagerBase {
 
   public doYourJob(creep: Creep, spawn: StructureSpawn): void {
     // TODO: make sure the creep is capable of this job
+    if (creep.ticksToLive && creep.ticksToLive < RENEW_THRESHOLD) {
+      creep.memory.renewing = true;
+    }
+
+    // Renew until full
+    if (creep.memory.renewing) {
+      const res = spawn.renewCreep(creep);
+      switch (res) {
+        case ERR_NOT_IN_RANGE:
+          creep.moveTo(spawn);
+          break;
+        case ERR_FULL:
+          creep.memory.renewing = false;
+          break;
+      }
+      return;
+    }
 
     // Harvest if you have no more energy
     if (
       !creep.memory.harvesting &&
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
-      // Should I renew?
-      const shouldRenew =
-        creep.ticksToLive && creep.ticksToLive < constants.RENEW_THRESHOLD;
-      const creepSize = creep.body.length;
-      const creepCost = creep.body
-        .map(part => BODYPART_COST[part.type])
-        .reduce((total, val) => total + val);
-      const renewCost = Math.ceil(creepCost / 2.5 / creepSize);
-
-      if (shouldRenew && spawn.store[RESOURCE_ENERGY] > renewCost) {
-        if (spawn.renewCreep(creep) === ERR_NOT_IN_RANGE) {
-          creep.moveTo(spawn);
-          return;
-        }
-      }
-
       creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
@@ -79,7 +81,9 @@ export default class UpgradeManager extends ManagerBase {
 
     // Loop action: upgrade controller or harvest from energy source
     if (creep.memory.harvesting) {
-      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      this.resourceManager.withdraw(creep, RESOURCE_ENERGY, {
+        upgrading: true
+      });
       return;
     }
 
@@ -97,8 +101,10 @@ export default class UpgradeManager extends ManagerBase {
   public static create(spawn: StructureSpawn, energyCapacity: number): void {
     const name = `Upgrader${Game.time}`;
     const parts =
-      energyCapacity >= 550
-        ? [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]
+      energyCapacity >= 1250
+        ? XPARTS([WORK, 3], [CARRY, 8], [MOVE, 11])
+        : energyCapacity >= 550
+        ? XPARTS([WORK, 2], [CARRY, 3], [MOVE, 4])
         : [WORK, CARRY, MOVE];
     const opts = { memory: { role: this.role } };
     if (spawn.spawnCreep(parts, name, opts) === OK)

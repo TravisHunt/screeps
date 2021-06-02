@@ -1,7 +1,6 @@
 import ManagerBase from "managers/base.manager";
 import ResourceManager from "managers/resource/resource.manager";
 import * as constants from "screeps.constants";
-import * as palette from "palette";
 
 export default class HarvestManager extends ManagerBase {
   public static readonly roleHarvester = "harvester";
@@ -79,47 +78,8 @@ export default class HarvestManager extends ManagerBase {
       this.resourceManager.withdraw(harvester, RESOURCE_ENERGY, {
         ignoreStores: true
       });
-      return;
-    }
-
-    // Top up energy stores on structures if needed
-    let structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
-      filter: s => {
-        return (
-          (s.structureType === STRUCTURE_SPAWN ||
-            s.structureType === STRUCTURE_EXTENSION) &&
-          s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-        );
-      }
-    });
-
-    // If spawns, extension, and towers are good, default to containers
-    if (!structure) {
-      structure = harvester.pos.findClosestByRange(FIND_STRUCTURES, {
-        filter: s =>
-          s.structureType === STRUCTURE_STORAGE &&
-          s.store.getFreeCapacity(RESOURCE_ENERGY)
-      });
-    }
-
-    if (structure) {
-      // Deposit energy into structure
-      if (harvester.transfer(structure, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-        harvester.moveTo(structure, {
-          visualizePathStyle: { stroke: palette.PATH_COLOR_TRANSFER }
-        });
-      }
     } else {
-      // No where to store energy
-      if (
-        harvester.room.controller &&
-        harvester.upgradeController(harvester.room.controller) ===
-          ERR_NOT_IN_RANGE
-      ) {
-        harvester.moveTo(harvester.room.controller, {
-          visualizePathStyle: { stroke: palette.PATH_COLOR_UPGRADE }
-        });
-      }
+      this.resourceManager.deposit(harvester, RESOURCE_ENERGY);
     }
   }
 

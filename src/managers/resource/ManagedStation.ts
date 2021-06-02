@@ -14,6 +14,10 @@ export default abstract class ManagedStation<Type extends RoomObject> {
 
   public abstract run(): StationInsights;
 
+  public get pos(): RoomPosition {
+    return this.station.pos;
+  }
+
   public get positions(): OccupiablePosition[] {
     return this._positions;
   }
