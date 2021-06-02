@@ -81,7 +81,9 @@ export default class UpgradeManager extends ManagerBase {
 
     // Loop action: upgrade controller or harvest from energy source
     if (creep.memory.harvesting) {
-      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      this.resourceManager.withdraw(creep, RESOURCE_ENERGY, {
+        upgrading: true
+      });
       return;
     }
 

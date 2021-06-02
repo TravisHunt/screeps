@@ -12,16 +12,20 @@ import {
 } from "utils/typeGuards";
 import Queue from "utils/Queue";
 import XPARTS from "utils/XPARTS";
+import OneWayLink from "OneWayLink";
 
 export default class ResourceManager extends ManagerBase {
   public static readonly roleCourier = "courier";
   private courierMax: number;
+  private spawns: StructureSpawn[] = [];
+  private extensions: StructureExtension[] = [];
   private sources: ManagedSource[] = [];
   private containers: StructureContainer[] = [];
   private storageUnits: StructureStorage[] = [];
   private harvestQueue: HarvestQueue;
   private deliveryQueue: Queue<ResourceRequest>;
   private couriers: Creep[] = [];
+  private ctrlLink?: OneWayLink;
 
   public constructor(room: Room, courierMax: number) {
     super(room);
@@ -31,14 +35,21 @@ export default class ResourceManager extends ManagerBase {
     this.courierMax = courierMax;
     this.sources = this.memory.sources.map(s => new ManagedSource(s));
 
-    // const containers = this.memory.containers
+    this.spawns = this.memory.spawns
+      .map(id => Game.getObjectById(id))
+      .filter(s => s !== null) as StructureSpawn[];
+
+    this.extensions = this.memory.extensions
+      .map(id => Game.getObjectById(id))
+      .filter(s => s !== null) as StructureExtension[];
+
     this.containers = this.memory.containers
       .map(id => Game.getObjectById(id))
       .filter(c => c !== null) as StructureContainer[];
 
-    this.storageUnits = this.memory.storageUnits.map(
-      id => Game.getObjectById(id) as StructureStorage
-    );
+    this.storageUnits = this.memory.storageUnits
+      .map(id => Game.getObjectById(id))
+      .filter(s => s !== null) as StructureStorage[];
 
     if (!this.memory.harvestQueue) this.memory.harvestQueue = [];
     if (!this.memory.deliveryQueue) this.memory.deliveryQueue = [];
@@ -50,6 +61,22 @@ export default class ResourceManager extends ManagerBase {
       name => name in Game.creeps
     );
     this.couriers = this.memory.courierNames.map(name => Game.creeps[name]);
+
+    // Check for energy link from source to controller.
+    this.refreshSourceToCtrlLink();
+
+    // gather links
+    if (this.memory.ctrlLink) {
+      const srcLink = this.memory.ctrlLink.a
+        ? Game.getObjectById(this.memory.ctrlLink.a)
+        : null;
+      const ctrlLink = this.memory.ctrlLink.b
+        ? Game.getObjectById(this.memory.ctrlLink.b)
+        : null;
+
+      if (srcLink && ctrlLink)
+        this.ctrlLink = new OneWayLink(srcLink, ctrlLink);
+    }
   }
 
   /**
@@ -99,6 +126,11 @@ export default class ResourceManager extends ManagerBase {
           );
         }
       }
+    }
+
+    // Transfer energy to controller over link if we have one.
+    if (this.ctrlLink && this.ctrlLink.senderFreeCapacity === 0) {
+      this.ctrlLink.send();
     }
 
     // Assign unoccupied harvest positions to creeps waiting in the queue
@@ -309,6 +341,67 @@ export default class ResourceManager extends ManagerBase {
       });
   }
 
+  public deposit<R extends ResourceConstant>(
+    creep: Creep,
+    type: R,
+    opts?: DepositOpts
+  ): utils.ResourceReturnCode | ScreepsReturnCode {
+    if (creep.spawning) return utils.ERR_CREEP_SPAWNING;
+    switch (type) {
+      case RESOURCE_ENERGY:
+        return this.depositEnergy(creep, opts);
+      default:
+        console.log("ResourceManager.deposit: RESOURCE NOT IMPLEMENTED");
+        return utils.ERR_RESOURCE_NOT_IMPLEMENTED;
+    }
+  }
+
+  private depositEnergy(creep: Creep, opts?: DepositOpts): ScreepsReturnCode {
+    let target: AnyStoreStructure | undefined;
+    let retCode: ScreepsReturnCode | undefined;
+
+    const spawnsWithSpace = this.spawns.filter(
+      s => s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+    );
+    const extWithSpace = this.extensions.filter(
+      ext => ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+    );
+
+    // Deposit location priority
+    // 1) Spawns
+    // 2) Extensions
+    // 3) Controller link
+    // 4) Storage
+    if (spawnsWithSpace.length) {
+      target = spawnsWithSpace[0];
+      retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
+    } else if (extWithSpace.length) {
+      target = extWithSpace[0];
+      retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
+    } else if (this.ctrlLink && this.ctrlLink.senderFreeCapacity > 0) {
+      target = this.ctrlLink.sender;
+      retCode = this.ctrlLink.transfer(creep, opts);
+    } else if (
+      this.room.storage &&
+      this.room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+    ) {
+      target = this.room.storage;
+      retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
+    }
+
+    if (!target || !retCode) return ERR_FULL;
+
+    switch (retCode) {
+      case ERR_NOT_IN_RANGE:
+        creep.moveTo(target, {
+          visualizePathStyle: { stroke: palette.PATH_COLOR_TRANSFER }
+        });
+        break;
+    }
+
+    return retCode;
+  }
+
   /**
    * Request a type of resource be loaded into the given creep. The resource
    * manager will provide what it can if the entire order cannot be filled.
@@ -431,6 +524,21 @@ export default class ResourceManager extends ManagerBase {
     if (this.harvestQueue.containsCreep(creep.id))
       return utils.CREEP_IN_HARVEST_QUEUE;
 
+    // If an upgrader made the withdraw request, pull from controller link.
+    if (
+      opts &&
+      opts.upgrading &&
+      this.ctrlLink &&
+      !this.ctrlLink.receiverEmpty
+    ) {
+      return ResourceManager.creepWithdrawFrom(
+        creep,
+        RESOURCE_ENERGY,
+        this.ctrlLink.receiver,
+        opts && opts.amount
+      );
+    }
+
     const usingStore = !opts || !opts.ignoreStores;
     const amount =
       opts && opts.amount && opts.amount > 0
@@ -550,17 +658,24 @@ export default class ResourceManager extends ManagerBase {
    * by the ResourceManager instance.
    */
   private init(): void {
+    const structures = this.room.find(FIND_STRUCTURES);
+
+    const spawns = structures
+      .filter(s => s.structureType === STRUCTURE_SPAWN)
+      .map(s => s.id as Id<StructureSpawn>);
+
+    const extensions = structures
+      .filter(s => s.structureType === STRUCTURE_EXTENSION)
+      .map(s => s.id as Id<StructureExtension>);
+
     // Gather any containers or storage units in the room
-    const containers = this.room
-      .find(FIND_STRUCTURES, {
-        filter: { structureType: STRUCTURE_CONTAINER }
-      })
-      .map(c => c as StructureContainer);
-    const storageUnits = this.room
-      .find(FIND_MY_STRUCTURES, {
-        filter: { structureType: STRUCTURE_STORAGE }
-      })
-      .map(s => s as StructureStorage);
+    const containers = structures
+      .filter(s => s.structureType === STRUCTURE_CONTAINER)
+      .map(s => s.id as Id<StructureContainer>);
+
+    const storageUnits = structures
+      .filter(s => s.structureType === STRUCTURE_STORAGE)
+      .map(s => s.id as Id<StructureStorage>);
 
     if (!this.memory) {
       const managedResources: ManagedStationMemory<Source>[] = [];
@@ -579,19 +694,78 @@ export default class ResourceManager extends ManagerBase {
       }
 
       this.memory = {
+        spawns,
+        extensions,
         sources: managedResources,
-        containers: containers.map(c => c.id),
-        storageUnits: storageUnits.map(s => s.id),
+        containers,
+        storageUnits,
         harvestQueue: [],
         deliveryQueue: [],
         courierNames: []
       };
     } else {
       // Refresh container and storage lists
-      this.memory.containers = containers.map(c => c.id);
-      this.memory.storageUnits = storageUnits.map(s => s.id);
+      this.memory.spawns = spawns;
+      this.memory.extensions = extensions;
+      this.memory.containers = containers;
+      this.memory.storageUnits = storageUnits;
 
       if (!this.memory.courierNames) this.memory.courierNames = [];
+    }
+  }
+
+  private refreshSourceToCtrlLink() {
+    // Controller must be >= level 5 to consider links.
+    if (!this.room.controller || this.room.controller.level < 5) return;
+
+    let sourceLink: StructureLink | null = null;
+    let ctrlLink: StructureLink | null = null;
+
+    // Be sure to remove a link id if it was destroyed.
+    if (this.memory.ctrlLink) {
+      if (this.memory.ctrlLink.a) {
+        sourceLink = Game.getObjectById(this.memory.ctrlLink.a);
+      }
+      if (this.memory.ctrlLink.b) {
+        ctrlLink = Game.getObjectById(this.memory.ctrlLink.b);
+      }
+    }
+
+    // We don't have a source link. Scan for one.
+    if (!sourceLink) {
+      for (const src of this.sources) {
+        const found = src.pos.findInRange(
+          FIND_MY_STRUCTURES,
+          constants.OUTPOST_RANGE,
+          { filter: { structureType: STRUCTURE_LINK } }
+        );
+        console.log(JSON.stringify(found));
+        if (found.length) {
+          sourceLink = found[0] as StructureLink;
+          break;
+        }
+      }
+    }
+
+    // We don't have a controller link. Scan for one.
+    if (!ctrlLink) {
+      const found = this.room.controller.pos.findInRange(
+        FIND_MY_STRUCTURES,
+        constants.OUTPOST_RANGE,
+        { filter: { structureType: STRUCTURE_LINK } }
+      );
+
+      if (found.length) ctrlLink = found[0] as StructureLink;
+    }
+
+    // If we have at least half the link, track it.
+    if (sourceLink && ctrlLink) {
+      this.memory.ctrlLink = {
+        a: sourceLink ? sourceLink.id : null,
+        b: ctrlLink ? ctrlLink.id : null
+      };
+    } else {
+      delete this.memory.ctrlLink;
     }
   }
 

@@ -1,6 +1,11 @@
 interface WithdrawOpts {
   amount?: number;
   ignoreStores?: boolean;
+  upgrading?: boolean;
+}
+
+interface DepositOpts {
+  amount?: number;
 }
 
 interface ManagedStationMemory<Type> {
@@ -30,14 +35,27 @@ interface HarvestJob {
 }
 
 interface ResourceManagerMemory {
+  spawns: Id<StructureSpawn>[];
+  extensions: Id<StructureExtension>[];
   sources: ManagedStationMemory<Source>[];
   containers: Id<StructureContainer>[];
   storageUnits: Id<StructureStorage>[];
   harvestQueue: [Id<Creep>, number][];
   deliveryQueue: ResourceRequest[];
   courierNames: string[];
+  ctrlLink?: LinkPairMemory;
 }
 
 interface StationInsights {
   cleanUp: { done: number; dead: number };
+}
+
+interface LinkPairMemory {
+  a: Id<StructureLink> | null;
+  b: Id<StructureLink> | null;
+}
+
+interface LinkPair {
+  a: StructureLink;
+  b: StructureLink;
 }
