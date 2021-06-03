@@ -1,22 +1,22 @@
 import ManagerBase from "managers/base.manager";
-import ResourceManager from "managers/resource/resource.manager";
 import * as constants from "screeps.constants";
+import ResourceService from "services/ResourceService";
 
 export default class HarvestManager extends ManagerBase {
   public static readonly roleHarvester = "harvester";
   public readonly harvesterMax: number;
   public harvesters: Creep[];
-  private resourceManager: ResourceManager;
+  private resourceService: ResourceService;
 
   public constructor(
     room: Room,
     harvesterMax: number,
-    resourceManager: ResourceManager
+    resourceManager: ResourceService
   ) {
     super(room);
 
     this.harvesterMax = harvesterMax;
-    this.resourceManager = resourceManager;
+    this.resourceService = resourceManager;
 
     this.harvesters = _.filter(
       Game.creeps,
@@ -75,11 +75,11 @@ export default class HarvestManager extends ManagerBase {
     }
 
     if (harvester.memory.harvesting) {
-      this.resourceManager.withdraw(harvester, RESOURCE_ENERGY, {
+      this.resourceService.submitResourceRequest(harvester, RESOURCE_ENERGY, {
         ignoreStores: true
       });
     } else {
-      this.resourceManager.deposit(harvester, RESOURCE_ENERGY);
+      this.resourceService.deposit(harvester, RESOURCE_ENERGY);
     }
   }
 

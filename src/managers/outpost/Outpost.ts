@@ -14,18 +14,13 @@ export default class Outpost extends ManagedLocation {
   public walls: StructureWall[] = [];
   public attendants: Creep[] = [];
   public perimeter: Perimeter;
+  private memory: OutpostMemory;
   private spawnName: string | undefined;
   private containerIds: Id<StructureContainer>[];
   private rampartIds: Id<StructureRampart>[];
   private towerIds: Id<StructureTower>[];
   private wallIds: Id<StructureWall>[];
   private attendantNames: string[];
-
-  public get memory(): OutpostMemory {
-    return Memory.outposts[this.base.roomName].outposts.find(
-      m => m.name === this.name
-    ) as OutpostMemory;
-  }
 
   public static createMemory(
     flag: Flag,
@@ -93,6 +88,7 @@ export default class Outpost extends ManagedLocation {
 
   public constructor(mem: OutpostMemory) {
     super();
+    this.memory = mem;
     this.name = mem.name;
     this.range = mem.range;
     this.spawnName = mem.spawnName;

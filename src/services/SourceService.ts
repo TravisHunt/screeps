@@ -7,30 +7,56 @@ import {
 } from "managers/resource/utils";
 import { debug } from "screeps.constants";
 import * as palette from "palette";
+import ManagedStation from "managers/resource/ManagedStation";
 
 export default class SourceService {
+  private memory: RoomMemory;
   private room: Room;
-  private sources: ManagedSource[] = [];
+  private sources: Source[] = [];
+  private managedSources: ManagedSource[] = [];
   private queue: HarvestQueue;
-
-  private get memory(): RoomMemory {
-    return Memory.rooms[this.room.name];
-  }
 
   public constructor(
     room: Room,
-    managed: ManagedStationMemory<Source>[],
-    queue: [Id<Creep>, number][]
+    sources: Source[],
+    queue: HarvestQueue,
+    memory: RoomMemory
   ) {
+    this.memory = memory;
     this.room = room;
-    this.sources = managed.map(ms => new ManagedSource(ms));
-    this.queue = new HarvestQueue(queue);
+    this.sources = sources;
+    this.queue = queue;
+
+    // Build managed sources from memory
+    for (const src of this.sources) {
+      let managedMemory = this.memory.managedSources.find(
+        ms => ms.stationId === src.id
+      );
+
+      // If we don't have a memory object for this source, we need to create
+      // and populate one with it's occupiable positions.
+      if (!managedMemory) {
+        managedMemory = ManagedStation.createMemoryObj(this.room.name, src);
+      }
+
+      this.managedSources.push(new ManagedSource(managedMemory));
+    }
+  }
+
+  public get harvestPositionCount(): number {
+    let count = 0;
+
+    for (const src of this.managedSources) {
+      count += src.positions.length;
+    }
+
+    return count;
   }
 
   public run(): void {
     // Run harvest jobs for creeps occupying harvest positions.
     // Clear occupied spaces where the occupier is done harvesting.
-    for (const source of this.sources) {
+    for (const source of this.managedSources) {
       const insight = source.run();
 
       if (debug) {
@@ -46,7 +72,7 @@ export default class SourceService {
     // Assign unoccupied harvest positions to creeps waiting in the queue
     if (this.queue.length) {
       // Get the number of unoccupied harvest positions
-      const unoccupied = this.sources
+      const unoccupied = this.managedSources
         .map(ms => ms.unoccupiedPositions.length)
         .reduce((acc, val) => acc + val);
 
@@ -100,7 +126,7 @@ export default class SourceService {
     // Highlight occupiable resource positions while in debug mode
     if (debug) {
       const visual = new RoomVisual(this.room.name);
-      const positions = this.sources
+      const positions = this.managedSources
         .map(s => s.positions)
         .reduce((acc, val) => acc.concat(val), []);
       for (const pos of positions) {
@@ -136,6 +162,37 @@ export default class SourceService {
     return CREEP_IN_HARVEST_QUEUE;
   }
 
+  public requestBuilds(): BuildRequest[] {
+    const requests: BuildRequest[] = [];
+
+    // Gather any harvest positions that have yet to be built. Sort by harvest
+    // position count so the source with the least amount of positions is
+    // queued first.
+    const sortedByHarvestPosCount = this.managedSources.sort(
+      (a, b) => a.positions.length - b.positions.length
+    );
+    for (const src of sortedByHarvestPosCount) {
+      const positions = src.findExpansionPositions();
+      if (positions.length) {
+        requests.push({ type: STRUCTURE_ROAD, positions });
+      }
+    }
+
+    return requests;
+  }
+
+  public getInNeedOfRepair(): Structure<StructureConstant>[] {
+    const structures: Structure<StructureConstant>[] = [];
+
+    for (const source of this.managedSources) {
+      source.positionsInNeedOfRepair.forEach(s => structures.push(s));
+    }
+
+    // TODO: handle managed containers and storage
+
+    return structures;
+  }
+
   /**
    * Checks if any harvest positions are currently being occupied by a creep
    * with the given Id string.
@@ -145,7 +202,7 @@ export default class SourceService {
   public isHarvesting(creepId: Id<Creep>): boolean {
     let harvesting = false;
 
-    for (const source of this.sources) {
+    for (const source of this.managedSources) {
       for (const pos of source.positions) {
         if (pos.occuiped && pos.occuiped.creepId === creepId) {
           harvesting = true;
@@ -162,7 +219,7 @@ export default class SourceService {
   }
 
   private getAvailableHarvestPosition(): OccupiablePosition | undefined {
-    for (const managed of this.sources) {
+    for (const managed of this.managedSources) {
       const pos = managed.getAvailablePosition();
       if (pos) return pos;
     }

@@ -1,25 +1,25 @@
-import ManagerBase from "managers/base.manager";
-import ResourceManager from "managers/resource/resource.manager";
 import { OUTPOST_NAME_PREFIX, OUTPOST_RANGE, debug } from "screeps.constants";
+import DeliveryService from "services/DeliveryService";
 import Outpost from "./Outpost";
 
-export default class OutpostManager extends ManagerBase {
-  public outposts: Outpost[] = [];
-  private resourceManager: ResourceManager;
-
-  private get memory(): OutpostManagerMemory {
-    return Memory.outposts[this.room.name];
-  }
+export default class OutpostManager {
+  public room: Room;
+  public outposts: Record<string, Outpost> = {};
+  private outpostMemory: Record<string, OutpostMemory>;
+  private deliveryService: DeliveryService;
 
   public constructor(
-    mem: OutpostManagerMemory,
+    outpostMemory: Record<string, OutpostMemory>,
     room: Room,
-    resourceManager: ResourceManager
+    resourceService: DeliveryService
   ) {
-    super(room);
-    this.resourceManager = resourceManager;
-    if (mem.outposts && mem.outposts.length)
-      this.outposts = mem.outposts.map(o => Outpost.getInstance(o));
+    this.room = room;
+    this.outpostMemory = outpostMemory;
+    this.deliveryService = resourceService;
+
+    for (const name in this.outpostMemory) {
+      this.outposts[name] = Outpost.getInstance(outpostMemory[name]);
+    }
   }
 
   public run(): void {
@@ -31,29 +31,32 @@ export default class OutpostManager extends ManagerBase {
     // For each outpost flag found, check if we're tracking this outpost.
     // TODO: What happens if an outpost flag is removed?
     for (const flag of outpostFlags) {
-      const exists = this.memory.outposts.find(o => o.name === flag.name);
-      if (!exists) {
+      if (flag.name in this.outposts === false) {
         // Save new outpost to memory and run-time list
         const newOutpostMemory = Outpost.createMemory(flag, OUTPOST_RANGE);
-        this.memory.outposts.push(newOutpostMemory);
-        this.outposts.push(Outpost.getInstance(newOutpostMemory));
+        this.outpostMemory[flag.name] = newOutpostMemory;
+        this.outposts[flag.name] = Outpost.getInstance(newOutpostMemory);
       }
     }
 
     // Let each outpost do it's work
-    this.outposts.forEach(o => o.run());
+    for (const name in this.outposts) {
+      this.outposts[name].run();
+    }
 
     // Submit resource requests from outposts to resource manager
-    const requests = this.outposts
-      .map(o => o.requestResources())
-      .reduce((acc, val) => acc.concat(val), []);
-
-    this.resourceManager.acceptResourceRequests(requests);
+    const requestLists: ResourceRequestFromBucket[][] = [];
+    for (const name in this.outposts) {
+      const req = this.outposts[name].requestResources();
+      requestLists.push(req);
+    }
+    const requests = requestLists.reduce((acc, val) => acc.concat(val), []);
+    this.deliveryService.acceptResourceRequests(requests);
 
     // Draw outpost debug overlay for each outpost
     if (debug) {
-      for (const outpost of this.outposts) {
-        Outpost.drawOverlayFor(outpost);
+      for (const name in this.outposts) {
+        Outpost.drawOverlayFor(this.outposts[name]);
       }
     }
   }

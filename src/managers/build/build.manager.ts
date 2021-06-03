@@ -1,8 +1,8 @@
 import ManagerBase from "managers/base.manager";
-import ResourceManager from "managers/resource/resource.manager";
 import * as utils from "managers/resource/utils";
 import * as palette from "palette";
 import * as constants from "screeps.constants";
+import ResourceService from "services/ResourceService";
 import Build from "./Build";
 import BuildQueue from "./BuildQueue";
 
@@ -13,7 +13,7 @@ export default class BuildManager extends ManagerBase {
   public readonly repairmanMax: number;
   public builders: Creep[];
   public repairmen: Creep[];
-  private resourceManager: ResourceManager;
+  private resourceService: ResourceService;
   private currentBuild?: Build;
   private buildQueue: BuildQueue;
 
@@ -21,12 +21,12 @@ export default class BuildManager extends ManagerBase {
     room: Room,
     builderMax: number,
     repairmanMax: number,
-    resourceManager: ResourceManager
+    resourceManager: ResourceService
   ) {
     super(room);
     this.builderMax = builderMax;
     this.repairmanMax = repairmanMax;
-    this.resourceManager = resourceManager;
+    this.resourceService = resourceManager;
 
     this.builders = _.filter(
       Game.creeps,
@@ -125,7 +125,7 @@ export default class BuildManager extends ManagerBase {
     }
 
     // Queue any build jobs requested by the resource manager
-    const requests = this.resourceManager.requestBuilds();
+    const requests = this.resourceService.requestBuilds();
     // check if these requests have already been queued before adding
     for (const req of requests) {
       const buildMem = Build.createMemoryInstance(
@@ -217,12 +217,12 @@ export default class BuildManager extends ManagerBase {
     }
 
     if (creep.memory.harvesting) {
-      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      this.resourceService.submitResourceRequest(creep, RESOURCE_ENERGY);
       return;
     }
 
     // TOOD: Check resourceManager for roads on harvest tiles.
-    const managerRepair = this.resourceManager.getInNeedOfRepair().shift();
+    const managerRepair = this.resourceService.getInNeedOfRepair().shift();
     const storage =
       this.room.storage &&
       this.room.storage.hits < this.room.storage.hitsMax * 0.75
@@ -317,7 +317,7 @@ export default class BuildManager extends ManagerBase {
 
     // Loop action: build site or harvest from energy source
     if (creep.memory.harvesting) {
-      this.resourceManager.withdraw(creep, RESOURCE_ENERGY);
+      this.resourceService.submitResourceRequest(creep, RESOURCE_ENERGY);
       return;
     }
 

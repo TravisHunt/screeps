@@ -47,6 +47,13 @@ export default class OneWayLink {
     return this.receiver.store.getUsedCapacity(RESOURCE_ENERGY) === 0;
   }
 
+  public get readyToSend(): boolean {
+    return (
+      this.sender.cooldown === 0 &&
+      this.sender.store.getFreeCapacity(RESOURCE_ENERGY) === 0
+    );
+  }
+
   /**
    * Initiates a transfer of energy from the Creep to the sender link.
    * @param creep - Creep transferring energy to sender

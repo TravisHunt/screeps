@@ -1,23 +1,23 @@
 import ManagerBase from "managers/base.manager";
-import ResourceManager from "managers/resource/resource.manager";
 import * as palette from "palette";
 import XPARTS from "utils/XPARTS";
 import { RENEW_THRESHOLD } from "screeps.constants";
+import ResourceService from "services/ResourceService";
 
 export default class UpgradeManager extends ManagerBase {
   public static readonly role = "upgrader";
   public readonly creepMax: number;
   public creeps: Creep[];
-  private resourceManager: ResourceManager;
+  private resourceService: ResourceService;
 
   public constructor(
     room: Room,
     max: number,
-    resourceManager: ResourceManager
+    resourceService: ResourceService
   ) {
     super(room);
     this.creepMax = max;
-    this.resourceManager = resourceManager;
+    this.resourceService = resourceService;
 
     this.creeps = _.filter(
       Game.creeps,
@@ -81,7 +81,7 @@ export default class UpgradeManager extends ManagerBase {
 
     // Loop action: upgrade controller or harvest from energy source
     if (creep.memory.harvesting) {
-      this.resourceManager.withdraw(creep, RESOURCE_ENERGY, {
+      this.resourceService.submitResourceRequest(creep, RESOURCE_ENERGY, {
         upgrading: true
       });
       return;

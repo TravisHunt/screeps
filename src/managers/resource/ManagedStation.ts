@@ -1,3 +1,5 @@
+import { Identifiable } from "utils/typeGuards";
+
 export default abstract class ManagedStation<Type extends RoomObject> {
   protected station: Type;
   protected room: Room;
@@ -69,15 +71,14 @@ export default abstract class ManagedStation<Type extends RoomObject> {
     return undefined;
   }
 
-  public static createMemoryObj<Type>(
+  public static createMemoryObj<Type extends Identifiable>(
     roomName: string,
-    stationId: Id<Type>,
-    positions: RoomPosition[]
+    station: Type
   ): ManagedStationMemory<Type> {
     const mem: ManagedStationMemory<Type> = {
       roomName,
-      stationId,
-      positions
+      stationId: station.id,
+      positions: ManagedStation.getOccupiablePositions(station.pos, roomName)
     };
 
     return mem;

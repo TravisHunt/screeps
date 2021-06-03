@@ -7,16 +7,30 @@ interface RoomMemory {
   courierNames: string[];
   managedSources: ManagedStationMemory<Source>[];
   spawnIds: Id<StructureSpawn>[];
+  extensionIds: Id<StructureExtension>[];
   sourceIds: Id<Source>[];
   containerIds: Id<StructureContainer>[];
   storageIds: Id<StructureStorage>[];
   terminalIds: Id<StructureTerminal>[];
+  rampartIds: Id<StructureRampart>[];
+  towerIds: Id<StructureTower>[];
+  wallIds: Id<StructureWall>[];
   outposts: Record<string, OutpostMemory>;
+  controllerLink?: LinkPairMemory;
+}
+
+interface RoomConfig {
+  harvesterMax?: number;
+  courierMax?: number;
+  builderMax?: number;
+  repairmanMax?: number;
+  upgraderMax?: number;
 }
 
 interface ResourceRequestOpts {
   amount?: number;
   ignoreStores?: boolean;
+  upgrading?: boolean;
 }
 
 interface RoomState {

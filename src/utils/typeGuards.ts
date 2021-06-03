@@ -4,6 +4,13 @@
  */
 
 /**
+ * Extends RoomObject with the id property.
+ */
+export interface Identifiable extends RoomObject {
+  id: Id<this>;
+}
+
+/**
  * Extends Structure with energy and energyCapacity properties.
  */
 export interface EnergyStructure extends Structure {
@@ -17,6 +24,16 @@ export interface EnergyStructure extends Structure {
 export interface StoreStructure extends Structure {
   store: StoreDefinition;
   storeCapacity: number;
+}
+
+/**
+ * Type guard that determines if the given room object is of type Identifiable,
+ * which is an object of type RoomObject with an id property.
+ * @param obj - An instance of RoomObject.
+ * @returns True if the instance is of type Identifiable, otherwise False.
+ */
+export function isIdentifiable(obj: RoomObject): obj is Identifiable {
+  return (obj as Identifiable).id !== undefined;
 }
 
 /**
