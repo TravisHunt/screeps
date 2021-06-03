@@ -102,6 +102,11 @@ export default class RoomManager {
         this.controllerLink = new OneWayLink(srcLink, controllerLink);
     }
 
+    // Build outpost instances
+    for (const name in this.memory.outposts) {
+      this.outposts[name] = Outpost.getInstance(this.memory.outposts[name]);
+    }
+
     // Init service for managing access to source harvesting
     this.resourceService = new ResourceService(
       this.room,
@@ -128,10 +133,10 @@ export default class RoomManager {
     );
 
     // Init service for managing outposts
-    // TODO: OutpostManager should accept room memory and outpost instances
     this.outpostService = new OutpostManager(
-      this.memory.outposts,
       this.room,
+      this.memory,
+      this.outposts,
       this.deliveryService
     );
 

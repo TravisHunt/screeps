@@ -5,21 +5,19 @@ import Outpost from "./Outpost";
 export default class OutpostManager {
   public room: Room;
   public outposts: Record<string, Outpost> = {};
-  private outpostMemory: Record<string, OutpostMemory>;
+  private memory: RoomMemory;
   private deliveryService: DeliveryService;
 
   public constructor(
-    outpostMemory: Record<string, OutpostMemory>,
     room: Room,
+    memory: RoomMemory,
+    outposts: Record<string, Outpost>,
     resourceService: DeliveryService
   ) {
     this.room = room;
-    this.outpostMemory = outpostMemory;
+    this.memory = memory;
+    this.outposts = outposts;
     this.deliveryService = resourceService;
-
-    for (const name in this.outpostMemory) {
-      this.outposts[name] = Outpost.getInstance(outpostMemory[name]);
-    }
   }
 
   public run(): void {
@@ -33,9 +31,13 @@ export default class OutpostManager {
     for (const flag of outpostFlags) {
       if (flag.name in this.outposts === false) {
         // Save new outpost to memory and run-time list
-        const newOutpostMemory = Outpost.createMemory(flag, OUTPOST_RANGE);
-        this.outpostMemory[flag.name] = newOutpostMemory;
-        this.outposts[flag.name] = Outpost.getInstance(newOutpostMemory);
+        this.memory.outposts[flag.name] = Outpost.createMemory(
+          flag,
+          OUTPOST_RANGE
+        );
+        this.outposts[flag.name] = Outpost.getInstance(
+          this.memory.outposts[flag.name]
+        );
       }
     }
 
