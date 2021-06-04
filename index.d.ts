@@ -1,4 +1,5 @@
 interface Memory {
+  version: string;
   logs: string[];
   roomState: Record<string, RoomState>;
   buildSchedules: Record<string, BuildSchedule>;

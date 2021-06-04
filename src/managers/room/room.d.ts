@@ -20,6 +20,7 @@ interface RoomMemory {
 }
 
 interface RoomConfig {
+  migrate?: boolean;
   harvesterMax?: number;
   courierMax?: number;
   builderMax?: number;
