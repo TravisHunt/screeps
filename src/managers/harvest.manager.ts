@@ -10,10 +10,11 @@ export default class HarvestManager extends ManagerBase {
 
   public constructor(
     room: Room,
+    memory: RoomMemory,
     harvesterMax: number,
     resourceManager: ResourceService
   ) {
-    super(room);
+    super(room, memory);
 
     this.harvesterMax = harvesterMax;
     this.resourceService = resourceManager;
@@ -24,10 +25,6 @@ export default class HarvestManager extends ManagerBase {
         creep.memory.role === HarvestManager.roleHarvester &&
         creep.room.name === this.room.name
     );
-  }
-
-  public get schedule(): BuildSchedule {
-    return Memory.buildSchedules[this.room.name];
   }
 
   public run(): void {

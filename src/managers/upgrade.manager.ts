@@ -12,10 +12,11 @@ export default class UpgradeManager extends ManagerBase {
 
   public constructor(
     room: Room,
+    memory: RoomMemory,
     max: number,
     resourceService: ResourceService
   ) {
-    super(room);
+    super(room, memory);
     this.creepMax = max;
     this.resourceService = resourceService;
 

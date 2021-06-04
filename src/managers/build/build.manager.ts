@@ -1,5 +1,6 @@
 import ManagerBase from "managers/base.manager";
 import * as utils from "managers/resource/utils";
+import RoomManager from "managers/room/RoomManager";
 import * as palette from "palette";
 import * as constants from "screeps.constants";
 import ResourceService from "services/ResourceService";
@@ -19,11 +20,12 @@ export default class BuildManager extends ManagerBase {
 
   public constructor(
     room: Room,
+    memory: RoomMemory,
     builderMax: number,
     repairmanMax: number,
     resourceManager: ResourceService
   ) {
-    super(room);
+    super(room, memory);
     this.builderMax = builderMax;
     this.repairmanMax = repairmanMax;
     this.resourceService = resourceManager;
@@ -41,33 +43,7 @@ export default class BuildManager extends ManagerBase {
         creep.room.name === this.room.name
     );
 
-    // Find build schedule in Memory. Create one if none found.
-    this.initBuildSchedule();
-
-    this.buildQueue = new BuildQueue(this.schedule.buildQueue);
-  }
-
-  /**
-   * Short-hand for Memory.buildSchedules[this.room.name]
-   */
-  public get schedule(): BuildSchedule {
-    return Memory.buildSchedules[this.room.name];
-  }
-  public set schedule(schedule: BuildSchedule) {
-    Memory.buildSchedules[this.room.name] = schedule;
-  }
-
-  /**
-   * Initializes the build schedule at Memory.buildSchedules[this.room.name]
-   */
-  private initBuildSchedule(): void {
-    if (!this.schedule) {
-      this.schedule = {
-        buildQueue: []
-      };
-    } else {
-      if (!this.schedule.buildQueue) this.schedule.buildQueue = [];
-    }
+    this.buildQueue = new BuildQueue(this.memory.buildQueue);
   }
 
   public run(): void {
@@ -78,16 +54,13 @@ export default class BuildManager extends ManagerBase {
     // TODO
 
     // Clear completed build. Stage next build.
-    if (
-      !this.schedule.currentBuildMemory ||
-      this.schedule.currentBuildMemory.complete
-    ) {
-      this.schedule.currentBuildMemory = undefined;
+    if (!this.memory.currentBuild || this.memory.currentBuild.complete) {
+      this.memory.currentBuild = undefined;
       const next = this.buildQueue.dequeue();
-      if (next) this.schedule.currentBuildMemory = next;
+      if (next) this.memory.currentBuild = next;
     }
-    if (this.schedule.currentBuildMemory) {
-      this.currentBuild = new Build(this.schedule.currentBuildMemory);
+    if (this.memory.currentBuild) {
+      this.currentBuild = new Build(this.memory.currentBuild);
     }
 
     try {
@@ -137,8 +110,7 @@ export default class BuildManager extends ManagerBase {
       // Verify that we aren't currently working this build, and that this
       // request is not in the build queue.
       const isCurrent =
-        this.schedule.currentBuildMemory &&
-        this.schedule.currentBuildMemory.id === buildMem.id;
+        this.memory.currentBuild && this.memory.currentBuild.id === buildMem.id;
 
       if (!isCurrent && !this.buildQueue.containsRequest(req)) {
         req.positions.forEach(pos => {
@@ -493,7 +465,7 @@ export default class BuildManager extends ManagerBase {
    * @param spawn - Spawn structure
    */
   private buildSourceQueueRoad(spawn: StructureSpawn): void {
-    const jobState = this.roomState.sourceQueueRoad;
+    const jobState = this.memory.state.sourceQueueRoad;
     if (!jobState)
       throw new Error("Job State Not Configured: Source Queue Road.");
     if (jobState.complete) return;
@@ -562,7 +534,7 @@ export default class BuildManager extends ManagerBase {
   }
 
   private spawnAdjacentWalkways(spawn: StructureSpawn): void {
-    const jobState = this.roomState.spawnAdjacentWalkways;
+    const jobState = this.memory.state.spawnAdjacentWalkways;
     if (!jobState)
       throw new Error("Job State Not Configured: Spawn Adjacent Walkways.");
     if (jobState.complete) return;
@@ -639,7 +611,7 @@ export default class BuildManager extends ManagerBase {
    * @param spawn - Spawn structure
    */
   private buildRoadSpawnToEnergySources(spawn: StructureSpawn): void {
-    const jobState = this.roomState.roadFromSpawnToEnergySources;
+    const jobState = this.memory.state.roadFromSpawnToEnergySources;
     if (!jobState)
       throw new Error("Job State Not Configured: Road from spawn to sources.");
     if (jobState.complete) return;
@@ -689,7 +661,7 @@ export default class BuildManager extends ManagerBase {
    * @param spawn - Spawn structure
    */
   private buildRoadSpawnToCtrl(spawn: StructureSpawn): void {
-    const jobState = this.roomState.roadFromSpawnToCtrl;
+    const jobState = this.memory.state.roadFromSpawnToCtrl;
     if (!jobState)
       throw new Error("Job State Not Configured: Road from spawn to ctrl.");
     if (jobState.complete) return;
@@ -735,14 +707,14 @@ export default class BuildManager extends ManagerBase {
     });
 
     for (const outpost of outpostFlags) {
-      if (outpost.name in this.roomState.outpostRoads === false) {
-        this.roomState.outpostRoads[outpost.name] = {
+      if (outpost.name in this.memory.state.outpostRoads === false) {
+        this.memory.state.outpostRoads[outpost.name] = {
           inprogress: false,
           complete: false
         };
       }
 
-      const state = this.roomState.outpostRoads[outpost.name];
+      const state = this.memory.state.outpostRoads[outpost.name];
       if (state.complete) continue;
 
       // Path has not yet been planned

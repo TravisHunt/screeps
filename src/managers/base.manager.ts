@@ -1,12 +1,10 @@
 export default abstract class ManagerBase {
   protected room: Room;
+  protected memory: RoomMemory;
 
-  public constructor(room: Room) {
+  public constructor(room: Room, memory: RoomMemory) {
     this.room = room;
-  }
-
-  protected get roomState(): RoomState {
-    return Memory.rooms[this.room.name].state;
+    this.memory = memory;
   }
 
   public abstract run(): void;

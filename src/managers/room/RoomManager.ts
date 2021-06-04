@@ -153,6 +153,7 @@ export default class RoomManager {
 
     this.harvestManager = new HarvestManager(
       this.room,
+      this.memory,
       harvesterMax,
       this.resourceService
     );
@@ -160,6 +161,7 @@ export default class RoomManager {
     // Init manager for builder creeps
     this.buildManager = new BuildManager(
       this.room,
+      this.memory,
       (config && config.builderMax) || BUILDER_MAX,
       (config && config.repairmanMax) || REPAIRMAN_MAX,
       this.resourceService
@@ -168,6 +170,7 @@ export default class RoomManager {
     // Init manager for upgrader creeps
     this.upgradeManager = new UpgradeManager(
       this.room,
+      this.memory,
       (config && config.upgraderMax) || UPGRADER_MAX,
       this.resourceService
     );
