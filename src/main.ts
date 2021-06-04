@@ -22,6 +22,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
   // Init memory tables for various processes
   if (!Memory.logs) Memory.logs = [];
+  if (!Memory.rooms) Memory.rooms = {};
 
   const roomManagers: RoomManager[] = [];
 

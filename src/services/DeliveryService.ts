@@ -90,7 +90,10 @@ export default class DeliveryService {
         if (!c.memory.harvesting && c.store.getFreeCapacity(contract.type)) {
           c.memory.harvesting = true;
         }
-        if (c.memory.harvesting && c.store.getFreeCapacity() === 0) {
+        if (
+          c.memory.harvesting &&
+          c.store.getFreeCapacity(contract.type) === 0
+        ) {
           // Should I renew?
           const shouldRenew = c.ticksToLive && c.ticksToLive < RENEW_THRESHOLD;
           const cSize = c.body.length;

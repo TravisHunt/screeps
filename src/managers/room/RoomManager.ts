@@ -240,37 +240,7 @@ export default class RoomManager {
   }
 
   private static migrateMemory(memory: RoomMemory, room: Room): void {
-    if (Memory.roomState && room.name in Memory.roomState) {
-      const old = Memory.roomState[room.name];
-      memory.state.roadFromSpawnToCtrl = old.roadFromSpawnToCtrl;
-      memory.state.roadFromSpawnToEnergySources =
-        old.roadFromSpawnToEnergySources;
-      memory.state.sourceQueueRoad = old.sourceQueueRoad;
-      memory.state.outpostRoads = old.outpostRoads;
-      memory.state.spawnAdjacentWalkways = old.spawnAdjacentWalkways;
-    }
-
-    if (Memory.buildSchedules && room.name in Memory.buildSchedules) {
-      const old = Memory.buildSchedules[room.name];
-      memory.currentBuild = old.currentBuildMemory;
-      memory.buildQueue = old.buildQueue;
-    }
-
-    if (Memory.resources && room.name in Memory.resources) {
-      const old = Memory.resources[room.name];
-      memory.courierNames = old.courierNames;
-      memory.harvestQueue = old.harvestQueue;
-      memory.deliveryQueue = old.deliveryQueue;
-      memory.controllerLink = old.ctrlLink;
-      memory.managedSources = old.sources;
-    }
-
-    if (Memory.outposts && room.name in Memory.outposts) {
-      const old = Memory.outposts[room.name].outposts;
-      for (const opmem of old) {
-        memory.outposts[opmem.name] = opmem;
-      }
-    }
+    console.log("Memory migration not implemented!");
   }
 
   private refreshIdCollections(): void {

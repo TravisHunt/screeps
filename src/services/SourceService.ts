@@ -37,6 +37,7 @@ export default class SourceService {
       // and populate one with it's occupiable positions.
       if (!managedMemory) {
         managedMemory = ManagedStation.createMemoryObj(this.room.name, src);
+        this.memory.managedSources.push(managedMemory);
       }
 
       this.managedSources.push(new ManagedSource(managedMemory));

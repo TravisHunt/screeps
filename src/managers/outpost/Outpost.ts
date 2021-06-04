@@ -1,6 +1,7 @@
 import ManagedLocation from "ManagedLocation";
 import { RENEW_THRESHOLD, USERNAME } from "screeps.constants";
 import XPARTS from "utils/XPARTS";
+
 export default class Outpost extends ManagedLocation {
   public static readonly roleAttendant = "attendant";
   public static readonly attendantMax = 1;
@@ -231,10 +232,10 @@ export default class Outpost extends ManagedLocation {
       if (!towerAction) {
         const outpostEnergyCapacity = this.containers
           .map(c => c.store.getCapacity())
-          .reduce((acc, val) => (acc += val));
+          .reduce((acc, val) => (acc += val), 0);
         const availableEnergy = this.containers
           .map(c => c.store[RESOURCE_ENERGY])
-          .reduce((acc, val) => (acc += val));
+          .reduce((acc, val) => (acc += val), 0);
 
         conserveEnergy = availableEnergy < outpostEnergyCapacity * 0.5;
         if (!conserveEnergy) towerAction = "repair";
