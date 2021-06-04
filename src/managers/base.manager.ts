@@ -6,7 +6,7 @@ export default abstract class ManagerBase {
   }
 
   protected get roomState(): RoomState {
-    return Memory.roomState[this.room.name];
+    return Memory.rooms[this.room.name].state;
   }
 
   public abstract run(): void;
