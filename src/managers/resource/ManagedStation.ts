@@ -1,13 +1,29 @@
 import { Identifiable } from "utils/typeGuards";
 
 export default abstract class ManagedStation<Type extends RoomObject> {
+  protected abstract readonly maintenanceCrewMax: number;
+  protected memory: ManagedStationMemory<Type>;
   protected station: Type;
   protected room: Room;
   protected _positions: OccupiablePosition[];
+  protected maintenanceCrew: Creep[] = [];
 
   public constructor(mem: ManagedStationMemory<Type>) {
+    this.memory = mem;
     this._positions = mem.positions;
     this.room = Game.rooms[mem.roomName];
+
+    // Account for objects that existed before this change.
+    if (mem.maintenanceCrewNames === undefined) mem.maintenanceCrewNames = [];
+
+    for (const name of mem.maintenanceCrewNames) {
+      if (name in Game.creeps) {
+        this.maintenanceCrew.push(Game.creeps[name]);
+      }
+    }
+
+    // Filter out dead names
+    this.memory.maintenanceCrewNames = this.maintenanceCrew.map(c => c.name);
 
     const station = Game.getObjectById(mem.stationId);
     if (station) this.station = station;
@@ -78,7 +94,8 @@ export default abstract class ManagedStation<Type extends RoomObject> {
     const mem: ManagedStationMemory<Type> = {
       roomName,
       stationId: station.id,
-      positions: ManagedStation.getOccupiablePositions(station.pos, roomName)
+      positions: ManagedStation.getOccupiablePositions(station.pos, roomName),
+      maintenanceCrewNames: []
     };
 
     return mem;

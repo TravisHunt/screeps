@@ -1,8 +1,17 @@
 import ManagedStation from "./ManagedStation";
+import MaintenanceService from "services/MaintenanceService";
+import { RENEW_THRESHOLD } from "screeps.constants";
+import { PATH_COLOR_HARVEST, PATH_COLOR_REPAIR } from "palette";
 
 export default class ManagedSource extends ManagedStation<Source> {
+  public readonly maintenanceCrewMax = 1;
+  private maintenanceService: MaintenanceService;
+
   public constructor(memory: ManagedStationMemory<Source>) {
     super(memory);
+
+    // Pull in the maintenance service singleton
+    this.maintenanceService = MaintenanceService.getInstance();
   }
 
   public get source(): Source {
@@ -10,8 +19,29 @@ export default class ManagedSource extends ManagedStation<Source> {
   }
 
   public run(): StationInsights {
+    // Clean up occupied positions
     const [done, dead] = this.clean();
-    this.operate();
+
+    // Capture any spawning creep that belongs to this source
+    if (this.maintenanceCrew.length < this.maintenanceCrewMax) {
+      this.scanForSpawningPersonnel();
+    }
+
+    // Request maintenance crew if lacking
+    if (this.maintenanceCrew.length < this.maintenanceCrewMax) {
+      this.requestPersonnel();
+    }
+
+    // Drive maintainers
+    if (this.maintenanceCrew.length) {
+      this.runMaintenanceCrew();
+    }
+
+    // Run jobs and manage occupied positions
+    this.runOccupants();
+
+    // Save current personnel list
+    this.memory.maintenanceCrewNames = this.maintenanceCrew.map(c => c.id);
 
     return {
       cleanUp: { done, dead }
@@ -117,7 +147,113 @@ export default class ManagedSource extends ManagedStation<Source> {
     return [finishedCount, corpseCount];
   }
 
-  private operate(): void {
+  private scanForSpawningPersonnel(): void {
+    const spawns = this.room.find(FIND_MY_SPAWNS);
+    for (const spawn of spawns) {
+      if (!spawn.spawning) continue;
+      const creep = Game.creeps[spawn.spawning.name];
+      if (creep.memory.ownerTag === this.source.id) {
+        this.maintenanceCrew.push(creep);
+      }
+    }
+  }
+
+  private requestPersonnel(): void {
+    const res = this.maintenanceService.submitPersonnelRequest(
+      this.room.name,
+      this.source.id
+    );
+
+    // Log error response
+    if (res !== OK) {
+      console.log(
+        `ManagedSource (${this.source.id}) maintenance request error:`,
+        res.message
+      );
+    }
+  }
+
+  private runMaintenanceCrew(): void {
+    const availableCrew = this.maintenanceCrew.filter(c => !c.spawning);
+    if (!availableCrew.length) return;
+
+    const roads = this.positionsInNeedOfRepair.sort((a, b) => a.hits - b.hits);
+    const limit = Math.min(roads.length, availableCrew.length);
+
+    for (let i = 0; i < limit; i++) {
+      const creep = availableCrew[i];
+      const road = roads[i];
+
+      // Harvest if you have no more energy
+      if (
+        !creep.memory.harvesting &&
+        creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
+      ) {
+        // Should I renew?
+        if (creep.ticksToLive && creep.ticksToLive < RENEW_THRESHOLD) {
+          creep.memory.renewing = true;
+        }
+
+        // Renew until full
+        if (creep.memory.renewing) {
+          const spawn = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
+
+          if (!spawn) {
+            creep.say("Guess I'll Die");
+            creep.memory.renewing = false;
+          } else {
+            const res = spawn.renewCreep(creep);
+
+            switch (res) {
+              case ERR_NOT_IN_RANGE:
+                creep.moveTo(spawn);
+                break;
+              case ERR_FULL:
+                creep.memory.renewing = false;
+                break;
+            }
+
+            // Continue so we continue renewing until full
+            continue;
+          }
+        }
+
+        creep.memory.harvesting = true;
+        creep.say("🔄 harvest");
+      }
+
+      // Repair if you're at carrying capacity
+      if (
+        creep.memory.harvesting &&
+        creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0
+      ) {
+        creep.memory.harvesting = false;
+        creep.say("🚧 repair");
+      }
+
+      // TODO: use ResourceService to get energy
+      if (creep.memory.harvesting) {
+        if (this.room.storage) {
+          if (
+            creep.withdraw(this.room.storage, RESOURCE_ENERGY) ===
+            ERR_NOT_IN_RANGE
+          ) {
+            creep.moveTo(this.room.storage, {
+              visualizePathStyle: { stroke: PATH_COLOR_HARVEST }
+            });
+          }
+        }
+      } else {
+        if (creep.repair(road) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(road, {
+            visualizePathStyle: { stroke: PATH_COLOR_REPAIR }
+          });
+        }
+      }
+    }
+  }
+
+  private runOccupants(): void {
     for (const pos of this.occupiedPositions) {
       const creep = Game.getObjectById(pos.occuiped.creepId);
       if (!creep) continue;
