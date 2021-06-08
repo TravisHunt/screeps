@@ -48,17 +48,27 @@ export default abstract class ManagedStation<Type extends RoomObject> {
     return this._positions.filter(p => p.occuiped) as OccupiedPosition[];
   }
 
-  public get positionsInNeedOfRepair(): StructureRoad[] {
-    const roadsToRepair: StructureRoad[] = [];
+  public get positionRoads(): StructureRoad[] {
+    const roads: StructureRoad[] = [];
 
     for (const pos of this._positions) {
       const road = this.room
         .lookForAt(LOOK_STRUCTURES, pos.x, pos.y)
         .find(s => s.structureType === STRUCTURE_ROAD);
 
+      if (road) roads.push(road as StructureRoad);
+    }
+
+    return roads;
+  }
+
+  public get positionsInNeedOfRepair(): StructureRoad[] {
+    const roadsToRepair: StructureRoad[] = [];
+
+    for (const road of this.positionRoads) {
       // TODO: Define repair threshold constant
       if (road && road.hits < road.hitsMax * 0.75) {
-        roadsToRepair.push(road as StructureRoad);
+        roadsToRepair.push(road);
       }
     }
 

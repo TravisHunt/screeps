@@ -41,7 +41,7 @@ export default class ManagedSource extends ManagedStation<Source> {
     this.runOccupants();
 
     // Save current personnel list
-    this.memory.maintenanceCrewNames = this.maintenanceCrew.map(c => c.id);
+    this.memory.maintenanceCrewNames = this.maintenanceCrew.map(c => c.name);
 
     return {
       cleanUp: { done, dead }
@@ -166,10 +166,10 @@ export default class ManagedSource extends ManagedStation<Source> {
 
     // Log error response
     if (res !== OK) {
-      console.log(
-        `ManagedSource (${this.source.id}) maintenance request error:`,
-        res.message
-      );
+      // console.log(
+      //   `ManagedSource (${this.source.id}) maintenance request error:`,
+      //   res.message
+      // );
     }
   }
 
@@ -177,13 +177,14 @@ export default class ManagedSource extends ManagedStation<Source> {
     const availableCrew = this.maintenanceCrew.filter(c => !c.spawning);
     if (!availableCrew.length) return;
 
-    const roads = this.positionsInNeedOfRepair.sort((a, b) => a.hits - b.hits);
-    const limit = Math.min(roads.length, availableCrew.length);
+    const roads = this.positionRoads
+      .filter(r => r.hits < r.hitsMax)
+      .sort((a, b) => a.hits - b.hits);
 
-    for (let i = 0; i < limit; i++) {
-      const creep = availableCrew[i];
-      const road = roads[i];
+    if (!roads.length) return;
+    const road = roads[0];
 
+    for (const creep of availableCrew) {
       // Harvest if you have no more energy
       if (
         !creep.memory.harvesting &&

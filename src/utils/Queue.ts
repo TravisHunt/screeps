@@ -78,7 +78,7 @@ export default class Queue<Type> {
    * @returns The first item in the queue.
    */
   public peek(): Type | undefined {
-    return !this.isEmpty ? this._queue[0] : undefined;
+    return this.isEmpty() ? undefined : this._queue[0];
   }
 
   /**

@@ -1,6 +1,7 @@
 import BestParts from "utils/BestParts";
 import Queue from "utils/Queue";
 import { Identifiable } from "utils/typeGuards";
+import { RoleMaintainer } from "roles";
 
 interface RoomMaintenance {
   roomName: string;
@@ -111,20 +112,23 @@ export default class MaintenanceService {
     roomName: string,
     ownerTag: Id<T>,
     creepCount = 1
-  ): MaintenanceError | OK {
+  ): OK {
     if (roomName in Game.rooms === false) {
       const msg = `${roomName} not found.`;
-      return new MaintenanceError(InvalidRoomError, msg);
+      // return new MaintenanceError(InvalidRoomError, msg);
+      return OK;
     }
 
     if (roomName in this.rooms === false) {
       const msg = `Room ${roomName} is not being tracked by the maintenance service.`;
-      return new MaintenanceError(MaintenanceNotTrackedError, msg);
+      // return new MaintenanceError(MaintenanceNotTrackedError, msg);
+      return OK;
     }
 
     if (!Game.getObjectById(ownerTag)) {
       const msg = `Object with id ${ownerTag} not found.`;
-      return new MaintenanceError(InvalidOwnerError, msg);
+      // return new MaintenanceError(InvalidOwnerError, msg);
+      return OK;
     }
 
     // Don't submit if we already have a personnel request from this owner
@@ -133,7 +137,8 @@ export default class MaintenanceService {
     });
     if (match) {
       const msg = `Owner ${ownerTag} already has a personnel request.`;
-      return new MaintenanceError(RequestAlreadySubmittedError, msg);
+      // return new MaintenanceError(RequestAlreadySubmittedError, msg);
+      return OK;
     }
 
     // If we have a good room, owner, and request, queue the request.

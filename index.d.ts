@@ -64,15 +64,3 @@ interface Coordinate {
 type LookPerimeterArray<
   T extends keyof AllLookAtTypes
 > = LookForAtAreaResultArray<AllLookAtTypes[T], T>;
-
-type RoleBuilder = "builder";
-type RoleCourier = "courier";
-type RoleHarvester = "harvester";
-type RoleMaintainer = "maintainer";
-
-type AnyCreepRole = RoleBuilder | RoleCourier | RoleHarvester | RoleMaintainer;
-
-declare const RoleBuilder: RoleBuilder;
-declare const RoleCourier: RoleCourier;
-declare const RoleHarvester: RoleHarvester;
-declare const RoleMaintainer: RoleMaintainer;

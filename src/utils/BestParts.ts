@@ -1,12 +1,13 @@
 import XPARTS from "./XPARTS";
+import * as roles from "roles";
 
 export default function BestParts(
-  role: AnyCreepRole,
+  role: roles.AnyCreepRole,
   spawn: StructureSpawn
 ): BodyPartConstant[] {
   let parts: BodyPartConstant[] = [];
 
-  if (role === RoleMaintainer) {
+  if (role === roles.RoleMaintainer) {
     parts = BestPartsMaintainer(spawn);
   } else {
     throw new Error(`BestParts: Role ${role} not yet implemented!`);
