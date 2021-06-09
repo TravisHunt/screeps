@@ -185,40 +185,40 @@ export default class ManagedSource extends ManagedStation<Source> {
     const road = roads[0];
 
     for (const creep of availableCrew) {
+      // Should I renew?
+      if (creep.ticksToLive && creep.ticksToLive < RENEW_THRESHOLD) {
+        creep.memory.renewing = true;
+      }
+
+      // Renew until full
+      if (creep.memory.renewing) {
+        const spawn = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
+
+        if (!spawn) {
+          creep.say("Guess I'll Die");
+          creep.memory.renewing = false;
+        } else {
+          const res = spawn.renewCreep(creep);
+
+          switch (res) {
+            case ERR_NOT_IN_RANGE:
+              creep.moveTo(spawn);
+              break;
+            case ERR_FULL:
+              creep.memory.renewing = false;
+              break;
+          }
+
+          // Continue so we continue renewing until full
+          if (creep.memory.renewing) continue;
+        }
+      }
+
       // Harvest if you have no more energy
       if (
         !creep.memory.harvesting &&
         creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
       ) {
-        // Should I renew?
-        if (creep.ticksToLive && creep.ticksToLive < RENEW_THRESHOLD) {
-          creep.memory.renewing = true;
-        }
-
-        // Renew until full
-        if (creep.memory.renewing) {
-          const spawn = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
-
-          if (!spawn) {
-            creep.say("Guess I'll Die");
-            creep.memory.renewing = false;
-          } else {
-            const res = spawn.renewCreep(creep);
-
-            switch (res) {
-              case ERR_NOT_IN_RANGE:
-                creep.moveTo(spawn);
-                break;
-              case ERR_FULL:
-                creep.memory.renewing = false;
-                break;
-            }
-
-            // Continue so we continue renewing until full
-            continue;
-          }
-        }
-
         creep.memory.harvesting = true;
         creep.say("🔄 harvest");
       }
