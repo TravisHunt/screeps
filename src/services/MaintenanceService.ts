@@ -1,25 +1,59 @@
+// #region imports
 import BestParts from "utils/BestParts";
 import Queue from "utils/Queue";
+import IRunnable from "interfaces/IRunnable";
 import { Identifiable } from "utils/typeGuards";
 import { RoleMaintainer } from "roles";
+import {
+  InvalidOwnerError,
+  InvalidRoomError,
+  MaintenanceNotTrackedError,
+  MaintenanceOk,
+  MaintenanceRequest,
+  MaintenanceServiceMemory,
+  MaintenanceStatus,
+  RequestAlreadySubmittedError,
+  RoomMaintenance
+} from "./maintenance.types";
+// #endregion imports
 
-interface RoomMaintenance {
-  roomName: string;
-  requestQueue: Queue<MaintenanceRequest>;
-}
-
-export default class MaintenanceService {
+/**
+ * MaintenanceService operates above the room level. This service uses the
+ * singleton pattern so that a single instance can be imported by any room
+ * service. For each visible room, this service processes requests for
+ * maintainer creeps.
+ */
+export default class MaintenanceService implements IRunnable {
+  /**
+   * Singleton MaintenanceService instance.
+   */
   private static instance: MaintenanceService;
+
+  /**
+   * Maintenance memory grouped by room name.
+   */
   private rooms: Record<string, RoomMaintenance>;
 
+  /**
+   * Memory.maintenance getter
+   */
   private get memory(): Record<string, MaintenanceServiceMemory> {
     return Memory.maintenance;
   }
 
+  /**
+   * Memory.maintenance setter
+   */
   private set memory(mem: Record<string, MaintenanceServiceMemory>) {
     Memory.maintenance = mem;
   }
 
+  /**
+   * MaintenanceService operates above the room level. This service uses the
+   * singleton pattern so that a single instance can be imported by any room
+   * service. For each visible room, this service processes requests for
+   * maintainer creeps.
+   */
   private constructor() {
     this.rooms = {};
 
@@ -42,6 +76,12 @@ export default class MaintenanceService {
     }
   }
 
+  /**
+   * Runs per-tick MaintenanceService tasks for each room.
+   * 1) Peeks at first request in queue.
+   * 2) Attempts to fill personnel request by spawning a maintainer.
+   * 3) TODO: handle service requests.
+   */
   public run(): void {
     // Run maintenance tasks for each room being tracked.
     for (const roomName in this.rooms) {
@@ -87,6 +127,9 @@ export default class MaintenanceService {
     this.save();
   }
 
+  /**
+   * Saves maintenance memory for each visible room.
+   */
   private save(): void {
     // Save arrays for each room's request queue
     for (const room in this.rooms) {
@@ -94,6 +137,11 @@ export default class MaintenanceService {
     }
   }
 
+  /**
+   * Creates a memory object for the given room.
+   * @param roomName - Room name
+   * @returns Maintenance memory object for room
+   */
   private static createMemory(roomName: string): MaintenanceServiceMemory {
     return {
       roomName,
@@ -101,6 +149,10 @@ export default class MaintenanceService {
     };
   }
 
+  /**
+   * Retrieves the MaintenanceService singleton.
+   * @returns Singleton instance
+   */
   public static getInstance(): MaintenanceService {
     if (!MaintenanceService.instance) {
       MaintenanceService.instance = new MaintenanceService();
@@ -108,27 +160,36 @@ export default class MaintenanceService {
     return MaintenanceService.instance;
   }
 
+  /**
+   * Queues a valid maintenance request to be processed when the MaintenanceService
+   * perform's it's per-tick process.
+   * @param roomName - Name of room
+   * @param ownerTag - Id of object making request
+   * @param creepCount - Optional number of creep requested. Default to 1.
+   * @returns Status of request
+   */
   public submitPersonnelRequest<T extends Identifiable>(
     roomName: string,
     ownerTag: Id<T>,
     creepCount = 1
-  ): OK {
+  ): MaintenanceStatus {
+    // Is this room visible?
     if (roomName in Game.rooms === false) {
-      const msg = `${roomName} not found.`;
-      // return new MaintenanceError(InvalidRoomError, msg);
-      return OK;
+      const message = `${roomName} not found.`;
+      return { code: InvalidRoomError, message };
     }
 
+    // Do we have a maintenance memory object for this room?
     if (roomName in this.rooms === false) {
-      const msg = `Room ${roomName} is not being tracked by the maintenance service.`;
-      // return new MaintenanceError(MaintenanceNotTrackedError, msg);
-      return OK;
+      const message = `Room ${roomName} is not being tracked by the maintenance service.`;
+      return { code: MaintenanceNotTrackedError, message };
     }
 
+    // Is this a valid game object id? It's possible that a structure was
+    // destroyed or the owner died.
     if (!Game.getObjectById(ownerTag)) {
-      const msg = `Object with id ${ownerTag} not found.`;
-      // return new MaintenanceError(InvalidOwnerError, msg);
-      return OK;
+      const message = `Object with id ${ownerTag} not found.`;
+      return { code: InvalidOwnerError, message };
     }
 
     // Don't submit if we already have a personnel request from this owner
@@ -136,9 +197,8 @@ export default class MaintenanceService {
       return req.type === "personnel" && req.ownerTag === (ownerTag as string);
     });
     if (match) {
-      const msg = `Owner ${ownerTag} already has a personnel request.`;
-      // return new MaintenanceError(RequestAlreadySubmittedError, msg);
-      return OK;
+      const message = `Owner ${ownerTag} already has a personnel request.`;
+      return { code: RequestAlreadySubmittedError, message };
     }
 
     // If we have a good room, owner, and request, queue the request.
@@ -150,6 +210,9 @@ export default class MaintenanceService {
     };
 
     this.rooms[roomName].requestQueue.enqueue(maintenanaceReq);
-    return OK;
+    return {
+      code: MaintenanceOk,
+      message: `Maintenance request queued: ${JSON.stringify(maintenanaceReq)}`
+    };
   }
 }

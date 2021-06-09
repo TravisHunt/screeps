@@ -2,6 +2,7 @@ import ManagedStation from "./ManagedStation";
 import MaintenanceService from "services/MaintenanceService";
 import { RENEW_THRESHOLD } from "screeps.constants";
 import { PATH_COLOR_HARVEST, PATH_COLOR_REPAIR } from "palette";
+import { MaintenanceOk } from "services/maintenance.types";
 
 export default class ManagedSource extends ManagedStation<Source> {
   public readonly maintenanceCrewMax = 1;
@@ -165,11 +166,11 @@ export default class ManagedSource extends ManagedStation<Source> {
     );
 
     // Log error response
-    if (res !== OK) {
-      // console.log(
-      //   `ManagedSource (${this.source.id}) maintenance request error:`,
-      //   res.message
-      // );
+    if (res.code === MaintenanceOk) {
+      console.log(
+        `ManagedSource (${this.source.id}) maintenance request error:`,
+        res.message
+      );
     }
   }
 
