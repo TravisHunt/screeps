@@ -1,6 +1,7 @@
 import { ErrorMapper } from "utils/ErrorMapper";
 import RoomManager from "managers/room/RoomManager";
 import MaintenanceService from "services/MaintenanceService";
+import { USERNAME } from "screeps.constants";
 
 const currentVersion = "0.0.2";
 
@@ -28,8 +29,19 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
   const roomManagers: RoomManager[] = [];
 
-  for (const room in Game.rooms) {
-    roomManagers.push(new RoomManager(room, { migrate: shouldMigrate }));
+  for (const name in Game.rooms) {
+    // If this is a newly visible room, we check to see if we want to manage.
+    if (name in Memory.rooms === false) {
+      const room = Game.rooms[name];
+      // To track, we need to be the owner of the controller
+      if (room.controller && room.controller.owner) {
+        if (room.controller.owner.username === USERNAME) {
+          roomManagers.push(new RoomManager(name, { migrate: shouldMigrate }));
+        }
+      }
+    } else {
+      roomManagers.push(new RoomManager(name, { migrate: shouldMigrate }));
+    }
   }
 
   roomManagers.forEach(rm => rm.run());
