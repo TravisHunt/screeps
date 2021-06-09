@@ -51,24 +51,35 @@ export default class HarvestManager extends ManagerBase {
       harvester.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
       // Should I renew?
-      const shouldRenew =
+      if (
         harvester.ticksToLive &&
-        harvester.ticksToLive < constants.RENEW_THRESHOLD;
-      const creepSize = harvester.body.length;
-      const creepCost = harvester.body
-        .map(part => BODYPART_COST[part.type])
-        .reduce((total, val) => total + val);
-      const renewCost = Math.ceil(creepCost / 2.5 / creepSize);
-
-      if (shouldRenew && spawn.store[RESOURCE_ENERGY] > renewCost) {
-        if (spawn.renewCreep(harvester) === ERR_NOT_IN_RANGE) {
-          harvester.moveTo(spawn);
-          return;
-        }
+        harvester.ticksToLive < constants.RENEW_THRESHOLD
+      ) {
+        harvester.memory.renewing = true;
       }
 
-      harvester.memory.harvesting = true;
-      harvester.say("🔄 harvest");
+      // Renew until full
+      if (harvester.memory.renewing) {
+        if (!spawn) {
+          harvester.say("Guess I'll Die");
+          harvester.memory.renewing = false;
+        } else {
+          const res = spawn.renewCreep(harvester);
+
+          switch (res) {
+            case ERR_NOT_IN_RANGE:
+              harvester.moveTo(spawn);
+              break;
+            case ERR_FULL:
+            case ERR_NOT_ENOUGH_ENERGY:
+              harvester.memory.renewing = false;
+              break;
+          }
+        }
+      } else {
+        harvester.memory.harvesting = true;
+        harvester.say("🔄 harvest");
+      }
     }
 
     if (harvester.memory.harvesting) {
