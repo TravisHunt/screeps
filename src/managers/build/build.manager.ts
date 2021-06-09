@@ -1,6 +1,5 @@
 import ManagerBase from "managers/base.manager";
 import * as utils from "managers/resource/utils";
-import RoomManager from "managers/room/RoomManager";
 import * as palette from "palette";
 import * as constants from "screeps.constants";
 import ResourceService from "services/ResourceService";
