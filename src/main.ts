@@ -1,5 +1,6 @@
 import { ErrorMapper } from "utils/ErrorMapper";
 import RoomManager from "managers/room/RoomManager";
+import MaintenanceService from "services/MaintenanceService";
 
 const currentVersion = "0.0.2";
 
@@ -23,6 +24,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   // Init memory tables for various processes
   if (!Memory.logs) Memory.logs = [];
   if (!Memory.rooms) Memory.rooms = {};
+  if (!Memory.maintenance) Memory.maintenance = {};
 
   const roomManagers: RoomManager[] = [];
 
@@ -31,4 +33,8 @@ export const loop = ErrorMapper.wrapLoop(() => {
   }
 
   roomManagers.forEach(rm => rm.run());
+
+  // Run maintenance jobs and process maintenance requests
+  const maintenanceService = MaintenanceService.getInstance();
+  maintenanceService.run();
 });

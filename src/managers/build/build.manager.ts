@@ -1,6 +1,5 @@
 import ManagerBase from "managers/base.manager";
 import * as utils from "managers/resource/utils";
-import RoomManager from "managers/room/RoomManager";
 import * as palette from "palette";
 import * as constants from "screeps.constants";
 import ResourceService from "services/ResourceService";
@@ -193,8 +192,6 @@ export default class BuildManager extends ManagerBase {
       return;
     }
 
-    // TOOD: Check resourceManager for roads on harvest tiles.
-    const managerRepair = this.resourceService.getInNeedOfRepair().shift();
     const storage =
       this.room.storage &&
       this.room.storage.hits < this.room.storage.hitsMax * 0.75
@@ -208,7 +205,6 @@ export default class BuildManager extends ManagerBase {
       .shift();
 
     const target =
-      managerRepair ||
       storage ||
       container ||
       this.room

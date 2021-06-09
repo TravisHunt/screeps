@@ -1,11 +1,8 @@
 interface Memory {
   version: string;
   logs: string[];
-  roomState: Record<string, RoomState>;
-  buildSchedules: Record<string, BuildSchedule>;
-  resources: Record<string, ResourceManagerMemory>;
-  outposts: Record<string, OutpostManagerMemory>;
   rooms: Record<string, RoomMemory>;
+  maintenance: Record<string, MaintenanceServiceMemory>;
 }
 
 interface CreepMemory {
@@ -16,6 +13,7 @@ interface CreepMemory {
   buildTarget?: Id<ConstructionSite>;
   origin?: string;
   contract?: ResourceDeliveryContract;
+  ownerTag?: string;
 }
 
 interface BuildTracking {

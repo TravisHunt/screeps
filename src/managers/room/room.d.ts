@@ -5,6 +5,7 @@ interface RoomMemory {
   harvestQueue: [Id<Creep>, number][];
   deliveryQueue: ResourceRequestFromBucket[];
   courierNames: string[];
+  balancerNames: string[];
   managedSources: ManagedStationMemory<Source>[];
   spawnIds: Id<StructureSpawn>[];
   extensionIds: Id<StructureExtension>[];

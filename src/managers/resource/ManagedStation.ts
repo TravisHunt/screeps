@@ -1,13 +1,29 @@
 import { Identifiable } from "utils/typeGuards";
 
 export default abstract class ManagedStation<Type extends RoomObject> {
+  protected abstract readonly maintenanceCrewMax: number;
+  protected memory: ManagedStationMemory<Type>;
   protected station: Type;
   protected room: Room;
   protected _positions: OccupiablePosition[];
+  protected maintenanceCrew: Creep[] = [];
 
   public constructor(mem: ManagedStationMemory<Type>) {
+    this.memory = mem;
     this._positions = mem.positions;
     this.room = Game.rooms[mem.roomName];
+
+    // Account for objects that existed before this change.
+    if (mem.maintenanceCrewNames === undefined) mem.maintenanceCrewNames = [];
+
+    for (const name of mem.maintenanceCrewNames) {
+      if (name in Game.creeps) {
+        this.maintenanceCrew.push(Game.creeps[name]);
+      }
+    }
+
+    // Filter out dead names
+    this.memory.maintenanceCrewNames = this.maintenanceCrew.map(c => c.name);
 
     const station = Game.getObjectById(mem.stationId);
     if (station) this.station = station;
@@ -32,17 +48,27 @@ export default abstract class ManagedStation<Type extends RoomObject> {
     return this._positions.filter(p => p.occuiped) as OccupiedPosition[];
   }
 
-  public get positionsInNeedOfRepair(): StructureRoad[] {
-    const roadsToRepair: StructureRoad[] = [];
+  public get positionRoads(): StructureRoad[] {
+    const roads: StructureRoad[] = [];
 
     for (const pos of this._positions) {
       const road = this.room
         .lookForAt(LOOK_STRUCTURES, pos.x, pos.y)
         .find(s => s.structureType === STRUCTURE_ROAD);
 
+      if (road) roads.push(road as StructureRoad);
+    }
+
+    return roads;
+  }
+
+  public get positionsInNeedOfRepair(): StructureRoad[] {
+    const roadsToRepair: StructureRoad[] = [];
+
+    for (const road of this.positionRoads) {
       // TODO: Define repair threshold constant
       if (road && road.hits < road.hitsMax * 0.75) {
-        roadsToRepair.push(road as StructureRoad);
+        roadsToRepair.push(road);
       }
     }
 
@@ -78,7 +104,8 @@ export default abstract class ManagedStation<Type extends RoomObject> {
     const mem: ManagedStationMemory<Type> = {
       roomName,
       stationId: station.id,
-      positions: ManagedStation.getOccupiablePositions(station.pos, roomName)
+      positions: ManagedStation.getOccupiablePositions(station.pos, roomName),
+      maintenanceCrewNames: []
     };
 
     return mem;

@@ -1,3 +1,4 @@
+import Balancer from "drivers/balancer";
 import BuildManager from "managers/build/build.manager";
 import HarvestManager from "managers/harvest.manager";
 import Outpost from "managers/outpost/Outpost";
@@ -26,6 +27,7 @@ export default class RoomManager {
   private storages: StructureStorage[] = [];
   private terminals: StructureTerminal[] = [];
   private couriers: Creep[] = [];
+  private balancers: Creep[] = [];
   private outposts: Record<string, Outpost> = {};
   private harvestQueue: HarvestQueue;
   private deliveryQueue: Queue<ResourceRequestFromBucket>;
@@ -36,6 +38,7 @@ export default class RoomManager {
   private harvestManager: HarvestManager;
   private buildManager: BuildManager;
   private upgradeManager: UpgradeManager;
+  private balancer: Balancer;
 
   private get memory(): RoomMemory {
     return Memory.rooms[this.room.name];
@@ -84,10 +87,15 @@ export default class RoomManager {
     this.storages = RoomManager.idsToObjects(this.memory.storageIds);
     this.terminals = RoomManager.idsToObjects(this.memory.terminalIds);
 
-    this.couriers = this.memory.courierNames
+    this.couriers = (this.memory.courierNames || [])
       .map(name => Game.creeps[name])
       .filter(c => c !== null);
     this.memory.courierNames = this.couriers.map(c => c.name);
+
+    this.balancers = (this.memory.balancerNames || [])
+      .map(name => Game.creeps[name])
+      .filter(c => c !== null);
+    this.memory.balancerNames = this.balancers.map(c => c.name);
 
     this.harvestQueue = new HarvestQueue(this.memory.harvestQueue);
     this.deliveryQueue = new Queue<ResourceRequestFromBucket>(
@@ -125,6 +133,15 @@ export default class RoomManager {
       this.harvestQueue,
       this.memory,
       this.controllerLink
+    );
+
+    // Init Balancer
+    this.balancer = new Balancer(
+      this.memory,
+      this.spawns,
+      this.extensions,
+      this.balancers,
+      this.resourceService
     );
 
     // Init service for managing resource deliveries
@@ -177,6 +194,8 @@ export default class RoomManager {
   }
 
   public run(): void {
+    this.balancer.run();
+
     this.harvestManager.run();
     this.buildManager.run();
     this.upgradeManager.run();
@@ -222,6 +241,7 @@ export default class RoomManager {
       harvestQueue: [],
       deliveryQueue: [],
       courierNames: [],
+      balancerNames: [],
 
       managedSources: [],
 

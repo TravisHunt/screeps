@@ -1,3 +1,6 @@
+/**
+ * A model to represent a group of construction sites as a unit.
+ */
 export default class Build {
   public id: number;
   public type: BuildableStructureConstant;
@@ -5,8 +8,6 @@ export default class Build {
   public sites: ConstructionSite[] = [];
   public positions: RoomPosition[];
   public complete: boolean;
-  private roomName: string;
-  private siteIds: Id<ConstructionSite>[];
 
   /**
    * Generates an id values by using a simple hashing function on the
@@ -40,6 +41,13 @@ export default class Build {
     return hash;
   }
 
+  /**
+   * Creates a new memory object for the Build model.
+   * @param type - Type of structure being built at sites
+   * @param roomName - Build's room name
+   * @param positions - List of RoomPositions where there are construction sites
+   * @returns Memory object for Build model
+   */
   public static createMemoryInstance(
     type: BuildableStructureConstant,
     roomName: string,
@@ -57,6 +65,9 @@ export default class Build {
     return memory;
   }
 
+  /**
+   * A model to represent a group of construction sites as a unit.
+   */
   public constructor(mem: BuildMemory) {
     if (!mem.id) throw new Error("Build object missing id");
     if (!mem.roomName) throw new Error(`Build ${mem.id} missing room`);
@@ -65,10 +76,8 @@ export default class Build {
 
     this.id = mem.id;
     this.type = mem.type;
-    this.roomName = mem.roomName;
-    this.room = Game.rooms[this.roomName];
+    this.room = Game.rooms[mem.roomName];
     this.complete = mem.complete;
-    this.siteIds = mem.siteIds;
     this.positions = mem.positions.map(
       loc => new RoomPosition(loc.x, loc.y, this.room.name)
     );
@@ -76,28 +85,24 @@ export default class Build {
     // If we don't have a list of construction site ids, then this job hasn't
     // been worked on since it was submitted. We need to find the construction
     // sites at the coordinates within mem.siteLocations.
-    if (!this.siteIds.length) {
+    if (!mem.siteIds.length) {
       for (const pos of this.positions) {
         const site = this.room.lookForAt(LOOK_CONSTRUCTION_SITES, pos).shift();
         if (site) mem.siteIds.push(site.id);
       }
     }
 
-    if (mem.siteIds.length !== this.positions.length) {
-      //       const log = `ERROR: Build ${mem.id} | ${this.positions.length} site \
-      // locations and ${mem.siteIds.length} construction sites found.`;
-      //       Memory.logs.push(log);
-      //       console.log(log);
-    }
-
     // If construction sites have been built, they won't show up here, which
     // is fine, because we only want builders to access lives sites.
-    for (const id of this.siteIds) {
+    for (const id of mem.siteIds) {
       const csite = Game.getObjectById(id);
       if (csite) this.sites.push(csite);
     }
 
     // If we find no construction sites, we can assume the build is complete.
-    if (!this.sites.length) this.complete = true;
+    if (!this.sites.length) {
+      mem.complete = true;
+      this.complete = true;
+    }
   }
 }
