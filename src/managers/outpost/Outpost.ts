@@ -14,6 +14,7 @@ export default class Outpost extends ManagedLocation {
   public towers: StructureTower[] = [];
   public walls: StructureWall[] = [];
   public attendants: Creep[] = [];
+  public constructionSites: ConstructionSite[] = [];
   public perimeter: Perimeter;
   private memory: OutpostMemory;
   private spawnName: string | undefined;
@@ -22,6 +23,9 @@ export default class Outpost extends ManagedLocation {
   private towerIds: Id<StructureTower>[];
   private wallIds: Id<StructureWall>[];
   private attendantNames: string[];
+  private constructionSiteIds: Id<
+    ConstructionSite<BuildableStructureConstant>
+  >[];
 
   public static createMemory(
     flag: Flag,
@@ -60,6 +64,12 @@ export default class Outpost extends ManagedLocation {
       .filter(s => s.structureType === STRUCTURE_WALL)
       .map(t => t.id as Id<StructureWall>);
 
+    const constructionSiteIds = Outpost.lookWithinPerimeter(
+      LOOK_CONSTRUCTION_SITES,
+      base.roomName,
+      perimeter
+    ).map(site => site.constructionSite.id);
+
     // TODO: Find attendents within perimeter
     const attendantNames = base
       .findInRange(FIND_MY_CREEPS, range, {
@@ -77,7 +87,8 @@ export default class Outpost extends ManagedLocation {
       rampartIds,
       towerIds,
       wallIds,
-      attendantNames
+      attendantNames,
+      constructionSiteIds
     };
 
     return memory;
@@ -100,6 +111,7 @@ export default class Outpost extends ManagedLocation {
     this.rampartIds = mem.rampartIds || [];
     this.towerIds = mem.towerIds || [];
     this.wallIds = mem.wallIds || [];
+    this.constructionSiteIds = mem.constructionSiteIds || [];
     this.attendantNames = mem.attendantNames || [];
 
     if (this.spawnName && Game.spawns[this.spawnName]) {
@@ -111,6 +123,10 @@ export default class Outpost extends ManagedLocation {
     Outpost.fillWithGameObjects(this.ramparts, this.rampartIds);
     Outpost.fillWithGameObjects(this.towers, this.towerIds);
     Outpost.fillWithGameObjects(this.walls, this.wallIds);
+    Outpost.fillWithGameObjects(
+      this.constructionSites,
+      this.constructionSiteIds
+    );
 
     // Clear dead ids
     // TODO: Should the outpost track positions of these objects so that
@@ -128,8 +144,98 @@ export default class Outpost extends ManagedLocation {
     this.attendants = this.attendantNames.map(name => Game.creeps[name]);
   }
 
+  private getAdjacentPositions(
+    pos: RoomPosition,
+    roomName: string,
+    diagonals = true
+  ): RoomPosition[] {
+    const positions: RoomPosition[] = [];
+
+    if (diagonals) {
+      // Scan bordering spaces for occupiable positions
+      for (let x = pos.x - 1; x <= pos.x + 1; x++) {
+        for (let y = pos.y - 1; y <= pos.y + 1; y++) {
+          // stations aren't walkable, so skip
+          if (x === pos.x && y === pos.y) continue;
+          // Don't include positions outside the bounds of the room
+          if (x < 0 || x > 49 || y < 0 || y > 49) continue;
+
+          const adj = new RoomPosition(x, y, roomName);
+          positions.push(adj);
+        }
+      }
+    } else {
+      positions.push(new RoomPosition(pos.x - 1, pos.y, roomName));
+      positions.push(new RoomPosition(pos.x + 1, pos.y, roomName));
+      positions.push(new RoomPosition(pos.x, pos.y - 1, roomName));
+      positions.push(new RoomPosition(pos.x, pos.y + 1, roomName));
+    }
+
+    return positions;
+  }
+
+  private getFirstFreeAdjacentPosition(
+    pos: RoomPosition,
+    roomName: string,
+    diagonals = true
+  ): RoomPosition | undefined {
+    const terrain = Game.rooms[roomName].getTerrain();
+    const adjacent = this.getAdjacentPositions(pos, roomName, diagonals);
+    const first = adjacent.find(
+      p =>
+        terrain.get(p.x, p.y) !== TERRAIN_MASK_WALL &&
+        p.lookFor(LOOK_STRUCTURES).length === 0 &&
+        p.lookFor(LOOK_CONSTRUCTION_SITES).length === 0
+    );
+    return first;
+  }
+
   public run(): void {
     this.rescan();
+
+    // If we don't have a container, see if we can have one
+    if (this.containers.length === 0) {
+      // Check for container construction sites
+      const csite = this.constructionSites.find(
+        s => s.structureType === STRUCTURE_CONTAINER
+      );
+
+      // TODO: set container max
+      if (!csite) {
+        const cPos = this.getFirstFreeAdjacentPosition(
+          this.base,
+          this.base.roomName
+        );
+
+        if (cPos) {
+          const room = Game.rooms[this.base.roomName];
+          const res = room.createConstructionSite(cPos, STRUCTURE_CONTAINER);
+          console.log(`${this.name} container creation status: ${res}`);
+        }
+      }
+    }
+
+    // If we don't have a tower, see if we can have one
+    if (this.towers.length === 0) {
+      // Check for tower construction sites
+      const csite = this.constructionSites.find(
+        s => s.structureType === STRUCTURE_TOWER
+      );
+
+      // TODO: set tower max
+      if (!csite) {
+        const towerPos = this.getFirstFreeAdjacentPosition(
+          this.base,
+          this.base.roomName
+        );
+
+        if (towerPos) {
+          const room = Game.rooms[this.base.roomName];
+          const res = room.createConstructionSite(towerPos, STRUCTURE_TOWER);
+          console.log(`${this.name} tower creation status: ${res}`);
+        }
+      }
+    }
 
     // Do we have attendants?
     if (this.attendants.length < Outpost.attendantMax) {
@@ -167,13 +273,31 @@ export default class Outpost extends ManagedLocation {
           return;
         }
 
-        // No energy. Grab energy from container.
-        if (attendant.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+        if (
+          !attendant.memory.harvesting &&
+          attendant.store.getUsedCapacity(RESOURCE_ENERGY) === 0
+        ) {
+          attendant.memory.harvesting = true;
+        }
+        if (
+          attendant.memory.harvesting &&
+          attendant.store.getFreeCapacity(RESOURCE_ENERGY) === 0
+        ) {
+          attendant.memory.harvesting = false;
+        }
+
+        if (attendant.memory.harvesting) {
+          // No energy. Grab energy from container.
           const container = this.containers.find(c => c.store[RESOURCE_ENERGY]);
           if (container) {
             const res = attendant.withdraw(container, RESOURCE_ENERGY);
             if (res === ERR_NOT_IN_RANGE) {
               attendant.moveTo(container);
+            }
+          } else {
+            // Return to base
+            if (attendant.pos.isEqualTo(this.base) === false) {
+              attendant.moveTo(this.base);
             }
           }
         } else {
@@ -192,12 +316,46 @@ export default class Outpost extends ManagedLocation {
           }
 
           // Repair ramparts
-          const rampart = this.ramparts.sort((a, b) => a.hits - b.hits).shift();
+          const rampart = this.ramparts
+            .sort((a, b) => a.hits - b.hits)
+            .find(r => r.hits < r.hitsMax);
+
           if (rampart) {
             if (attendant.repair(rampart) === ERR_NOT_IN_RANGE) {
               attendant.moveTo(rampart);
             }
             return;
+          }
+
+          // Repair roads
+          const road = Outpost.lookWithinPerimeter(
+            LOOK_STRUCTURES,
+            this.base.roomName,
+            this.perimeter
+          )
+            .filter(s => s.structure.structureType === STRUCTURE_ROAD)
+            .map(s => s.structure as StructureRoad)
+            .find(s => s.hits < s.hitsMax);
+
+          if (road) {
+            if (attendant.repair(road) === ERR_NOT_IN_RANGE) {
+              attendant.moveTo(road);
+            }
+            return;
+          }
+
+          // Contribute to construction sites
+          if (this.constructionSites.length) {
+            const site = this.constructionSites[0];
+            if (attendant.build(site) === ERR_NOT_IN_RANGE) {
+              attendant.moveTo(site);
+            }
+            return;
+          }
+
+          // Return to base
+          if (attendant.pos.isEqualTo(this.base) === false) {
+            attendant.moveTo(this.base);
           }
         }
       });
@@ -263,6 +421,15 @@ export default class Outpost extends ManagedLocation {
   }
 
   public rescan(): void {
+    // Capture construction sites
+    this.constructionSites = Outpost.lookWithinPerimeter(
+      LOOK_CONSTRUCTION_SITES,
+      this.base.roomName,
+      this.perimeter
+    ).map(x => x.constructionSite);
+    this.constructionSiteIds = this.constructionSites.map(s => s.id);
+    this.memory.constructionSiteIds = this.constructionSiteIds;
+
     const structures = Outpost.lookWithinPerimeter(
       LOOK_STRUCTURES,
       this.base.roomName,

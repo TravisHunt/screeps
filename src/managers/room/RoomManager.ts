@@ -149,7 +149,9 @@ export default class RoomManager {
       this.room,
       this.memory,
       this.couriers,
-      (config && config.courierMax) || COURIER_MAX,
+      (config && config.courierMax) ||
+        Object.keys(this.outposts).length ||
+        COURIER_MAX,
       this.deliveryQueue,
       this.resourceService
     );

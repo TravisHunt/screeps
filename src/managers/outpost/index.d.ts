@@ -13,6 +13,7 @@ interface OutpostMemory {
   towerIds: Id<StructureTower>[];
   wallIds: Id<StructureWall>[];
   attendantNames: string[];
+  constructionSiteIds: Id<ConstructionSite<BuildableStructureConstant>>[];
 }
 
 interface ResourceRequestFromBucket {

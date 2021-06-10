@@ -2,8 +2,28 @@ import { ErrorMapper } from "utils/ErrorMapper";
 import RoomManager from "managers/room/RoomManager";
 import MaintenanceService from "services/MaintenanceService";
 import { USERNAME } from "screeps.constants";
+import { QUADRANTS } from "utils/enums";
 
 const currentVersion = "0.0.2";
+
+declare global {
+  interface RoomPosition {
+    quadrant(): number;
+  }
+}
+
+RoomPosition.prototype.quadrant = function (): number {
+  const mid = 25;
+
+  // Position is in a quadrant
+  if (this.x >= mid) {
+    // Position is in either quadrant 1 or 4
+    return this.y >= mid ? QUADRANTS.I : QUADRANTS.IV;
+  } else {
+    // Position is in either quadrant 2 or 3
+    return this.y >= mid ? QUADRANTS.II : QUADRANTS.III;
+  }
+};
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
