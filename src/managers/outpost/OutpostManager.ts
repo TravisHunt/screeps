@@ -1,7 +1,7 @@
 import { OUTPOST_NAME_PREFIX, OUTPOST_RANGE, debug } from "screeps.constants";
 import DeliveryService from "services/DeliveryService";
 import Outpost from "./Outpost";
-import { QUADRANTS } from "utils/enums";
+import { QUADRANT } from "utils/enums";
 
 export default class OutpostManager {
   public room: Room;
@@ -30,6 +30,11 @@ export default class OutpostManager {
     // For each outpost flag found, check if we're tracking this outpost.
     // TODO: What happens if an outpost flag is removed?
     for (const flag of outpostFlags) {
+      const exitsInQuad = this.room.findWithinQuadrant(
+        FIND_EXIT,
+        flag.pos.quadrant()
+      );
+      console.log(`${flag.name} exits: ${JSON.stringify(exitsInQuad)}`);
       if (flag.name in this.outposts === false) {
         // Find quadrant to search for exits or guard targets
         const quadrant = flag.pos.quadrant();
@@ -40,13 +45,13 @@ export default class OutpostManager {
         const allExits = this.room.find(FIND_EXIT);
         let guardPositions: RoomPosition[] = [];
 
-        if (quadrant === QUADRANTS.I) {
+        if (quadrant === QUADRANT.I) {
           guardPositions = allExits.filter(p => p.x >= axis && p.y >= axis);
-        } else if (quadrant === QUADRANTS.II) {
+        } else if (quadrant === QUADRANT.II) {
           guardPositions = allExits.filter(p => p.x < axis && p.y >= axis);
-        } else if (quadrant === QUADRANTS.III) {
+        } else if (quadrant === QUADRANT.III) {
           guardPositions = allExits.filter(p => p.x < axis && p.y < axis);
-        } else if (quadrant === QUADRANTS.IV) {
+        } else if (quadrant === QUADRANT.IV) {
           guardPositions = allExits.filter(p => p.x >= axis && p.y < axis);
         }
 

@@ -1,4 +1,4 @@
-export default class Queue<Type> {
+export default class Queue<Type> implements IQueue<Type> {
   private _queue: Type[];
   private max: number;
 

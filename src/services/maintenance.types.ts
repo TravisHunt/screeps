@@ -2,8 +2,6 @@
  * Defines Types, Constants, and Interfaces used by the MaintenanceService.
  */
 
-import Queue from "utils/Queue";
-
 /** Maintenance task successful */
 export const MaintenanceOk = "OK";
 /** Maintenance task was given an invalid room name */
@@ -25,21 +23,4 @@ export type AnyMaintenanceStatus =
 export interface MaintenanceStatus {
   code: AnyMaintenanceStatus;
   message: string;
-}
-
-export interface MaintenanceRequest {
-  roomName: string;
-  type: "personnel" | "service";
-  ownerTag: string;
-  creepCount: number;
-}
-
-export interface MaintenanceServiceMemory {
-  roomName: string;
-  requestQueue: MaintenanceRequest[];
-}
-
-export interface RoomMaintenance {
-  roomName: string;
-  requestQueue: Queue<MaintenanceRequest>;
 }

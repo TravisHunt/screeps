@@ -9,11 +9,8 @@ import {
   InvalidRoomError,
   MaintenanceNotTrackedError,
   MaintenanceOk,
-  MaintenanceRequest,
-  MaintenanceServiceMemory,
   MaintenanceStatus,
-  RequestAlreadySubmittedError,
-  RoomMaintenance
+  RequestAlreadySubmittedError
 } from "./maintenance.types";
 // #endregion imports
 

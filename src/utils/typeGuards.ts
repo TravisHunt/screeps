@@ -126,3 +126,24 @@ export function isOwnedStructure(obj: Structure): obj is OwnedStructure {
 export function isSource(obj: Source | Mineral): obj is Source {
   return (obj as Source).energy !== undefined;
 }
+
+/**
+ * Type guard that determines if the given object has a RoomPosition.
+ * @param obj - Object with RoomPosition property
+ * @returns True if instance has RoomPosition property, otherwise False.
+ */
+export function hasPos(obj: HasPos | RoomPosition): obj is HasPos {
+  return (obj as HasPos).pos !== undefined;
+}
+
+export function findTypeHasPosition<F extends FindConstant>(
+  find: HasPos | FindTypes[F]
+): find is HasPos {
+  return (find as HasPos).pos !== undefined;
+}
+
+export function findTypeIsPosition<F extends FindConstant>(
+  find: RoomPosition | FindTypes[F]
+): find is RoomPosition {
+  return (find as RoomPosition).inQuadrant !== undefined;
+}
