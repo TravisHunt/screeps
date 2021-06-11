@@ -89,12 +89,12 @@ export default class RoomManager {
 
     this.couriers = (this.memory.courierNames || [])
       .map(name => Game.creeps[name])
-      .filter(c => c !== null);
+      .filter(c => c !== undefined);
     this.memory.courierNames = this.couriers.map(c => c.name);
 
     this.balancers = (this.memory.balancerNames || [])
       .map(name => Game.creeps[name])
-      .filter(c => c !== null);
+      .filter(c => c !== undefined);
     this.memory.balancerNames = this.balancers.map(c => c.name);
 
     this.harvestQueue = new HarvestQueue(this.memory.harvestQueue);
