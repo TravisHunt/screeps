@@ -6,23 +6,57 @@ import { findTypeHasPosition, findTypeIsPosition } from "utils/typeGuards";
  */
 declare global {
   interface Room {
+    /**
+     * Gets the username of the owner of this room's controller, if one exists.
+     */
     owner(): string | undefined;
+
+    /**
+     * Returns true if this room's controller is owned by me.
+     */
     my(): boolean;
 
-    _creeps: Creep[];
+    /**
+     * Get my creeps in this room.
+     */
     creeps(): Creep[];
+    _creeps: Creep[];
 
-    _hostiles: Creep[];
+    /**
+     * Get hostile creeps in this room.
+     */
     hostiles(): Creep[];
+    _hostiles: Creep[];
 
-    _invaders: Creep[];
+    /**
+     * Get invaders in this room. Invaders are hostile creeps owned by the
+     * Invader AI.
+     */
     invaders(): Creep[];
+    _invaders: Creep[];
 
-    _drops: Dictionary<Resource<ResourceConstant>[]>;
+    /**
+     * Finds dropped resources in this room.
+     */
     drops(): Dictionary<Resource<ResourceConstant>[]>;
+    _drops: Dictionary<Resource<ResourceConstant>[]>;
+
+    /**
+     * Finds dropped energy in this room.
+     */
     droppedEnergy(): Resource<RESOURCE_ENERGY>[];
+
+    /**
+     * Finds dropped power in this room.
+     */
     droppedPower(): Resource<RESOURCE_POWER>[];
 
+    /**
+     * Find objects in this room within the provided quadrant.
+     * @param find - FIND_* constant
+     * @param quadrant - One of four quadrants of this room's map
+     * @param opts - Filter options
+     */
     findWithinQuadrant<F extends FindConstant>(
       find: F,
       quadrant: number,
@@ -30,43 +64,6 @@ declare global {
     ): FindTypes[F][];
   }
 }
-
-Room.prototype.findWithinQuadrant = function (find, quadrant, opts) {
-  // If a filter was specified, save it to be run after area narrowing.
-  const providedFilter:
-    | FilterFunction<typeof find>
-    | FilterObject
-    | string
-    | undefined = opts && opts.filter ? opts.filter : undefined;
-
-  const options: FilterOptions<typeof find> = {
-    filter: item => {
-      let pos: RoomPosition;
-
-      if (findTypeHasPosition(item)) {
-        // Has RoomPosition property
-        pos = item.pos;
-      } else if (findTypeIsPosition(item)) {
-        // Is RoomPosition instance
-        pos = item;
-      } else {
-        // This shouldn't happen
-        console.log(`Room.findWithinQuadrant: item has no position (${find})`);
-        return false;
-      }
-
-      // Is position in the specified quadrant?
-      if (pos.inQuadrant(quadrant) === false) return false;
-
-      // The item is in the quadrant. Run user filter if provided.
-      return providedFilter
-        ? _.filter([item], providedFilter).length > 0
-        : true;
-    }
-  };
-
-  return this.find(find, options);
-};
 
 // #region common room properties
 Room.prototype.owner = function () {
@@ -127,5 +124,42 @@ Room.prototype.droppedPower = function () {
   return (this.drops()[RESOURCE_POWER] || []) as Resource<RESOURCE_POWER>[];
 };
 // #endregion
+
+Room.prototype.findWithinQuadrant = function (find, quadrant, opts) {
+  // If a filter was specified, save it to be run after area narrowing.
+  const providedFilter:
+    | FilterFunction<typeof find>
+    | FilterObject
+    | string
+    | undefined = opts && opts.filter ? opts.filter : undefined;
+
+  const options: FilterOptions<typeof find> = {
+    filter: item => {
+      let pos: RoomPosition;
+
+      if (findTypeHasPosition(item)) {
+        // Has RoomPosition property
+        pos = item.pos;
+      } else if (findTypeIsPosition(item)) {
+        // Is RoomPosition instance
+        pos = item;
+      } else {
+        // This shouldn't happen
+        console.log(`Room.findWithinQuadrant: item has no position (${find})`);
+        return false;
+      }
+
+      // Is position in the specified quadrant?
+      if (pos.inQuadrant(quadrant) === false) return false;
+
+      // The item is in the quadrant. Run user filter if provided.
+      return providedFilter
+        ? _.filter([item], providedFilter).length > 0
+        : true;
+    }
+  };
+
+  return this.find(find, options);
+};
 
 export {};

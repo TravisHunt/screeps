@@ -3,7 +3,17 @@ import { QUADRANT } from "utils/enums";
 
 declare global {
   interface RoomPosition {
+    /**
+     * Returns one of four quadrants depending on where this room position
+     * lies within the room.
+     */
     quadrant(): number;
+
+    /**
+     * Return true if this room position lies within the provided quadrant,
+     * otherwise false.
+     * @param quadrant - Quadrant query
+     */
     inQuadrant(quadrant: number): boolean;
 
     /**
