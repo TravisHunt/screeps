@@ -1,5 +1,5 @@
 import ManagedLocation from "ManagedLocation";
-import { RENEW_THRESHOLD, USERNAME } from "screeps.constants";
+import { RENEW_THRESHOLD, USERNAME, REPAIR_THRESHOLD } from "screeps.constants";
 import XPARTS from "utils/XPARTS";
 
 export default class Outpost extends ManagedLocation {
@@ -251,6 +251,14 @@ export default class Outpost extends ManagedLocation {
       }
     }
 
+    const hostiles = Outpost.lookWithinPerimeter(
+      LOOK_CREEPS,
+      this.base.roomName,
+      this.perimeter
+    )
+      .map(x => x.creep)
+      .filter(c => c.owner.username !== USERNAME);
+
     // Direct attendants
     this.attendants
       .filter(a => !a.spawning)
@@ -361,14 +369,6 @@ export default class Outpost extends ManagedLocation {
       });
 
     // Direct towers
-    const hostiles = Outpost.lookWithinPerimeter(
-      LOOK_CREEPS,
-      this.base.roomName,
-      this.perimeter
-    )
-      .map(x => x.creep)
-      .filter(c => c.owner.username !== USERNAME);
-
     if (hostiles.length) {
       const target = hostiles.sort((a, b) => a.hits - b.hits).shift();
       if (target) this.towers.forEach(t => t.attack(target));
@@ -410,7 +410,10 @@ export default class Outpost extends ManagedLocation {
         if (rampart) {
           this.towers.forEach(t => t.repair(rampart));
         } else {
-          const wall = this.walls.sort((a, b) => a.hits - b.hits).shift();
+          const wall = this.walls
+            .filter(w => w.hits < REPAIR_THRESHOLD[STRUCTURE_WALL])
+            .sort((a, b) => a.hits - b.hits)
+            .shift();
 
           if (wall) {
             this.towers.forEach(t => t.repair(wall));

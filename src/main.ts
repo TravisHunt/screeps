@@ -1,5 +1,6 @@
 import "prototypes/Room";
 import "prototypes/RoomPosition";
+import "prototypes/Creep";
 import { ErrorMapper } from "utils/ErrorMapper";
 import RoomManager from "managers/room/RoomManager";
 import MaintenanceService from "services/MaintenanceService";

@@ -24,6 +24,18 @@ declare global {
      * @param guard - RoomPositions to include in perimeter
      */
     perimeter(range: number, guard: RoomPosition[]): Perimeter;
+
+    /**
+     * Returns true if this room position lies within the given perimeter.
+     * @param perimeter - Rectangle perimeter object
+     */
+    inPerimeter(perimeter: Perimeter): boolean;
+
+    /**
+     * Finds a structure of the given type at this position if it exists.
+     * @param type - Type of structure
+     */
+    lookForStructure(type: StructureConstant): Structure | undefined;
   }
 }
 
@@ -77,6 +89,19 @@ RoomPosition.prototype.perimeter = function (range, guard) {
   };
 
   return perimeter;
+};
+
+RoomPosition.prototype.inPerimeter = function (perimeter) {
+  return (
+    this.x >= perimeter.x.min &&
+    this.x <= perimeter.x.max &&
+    this.y >= perimeter.y.min &&
+    this.y <= perimeter.y.max
+  );
+};
+
+RoomPosition.prototype.lookForStructure = function (type) {
+  return _.find(this.lookFor(LOOK_STRUCTURES), s => s.structureType === type);
 };
 
 export {};

@@ -1,4 +1,5 @@
 interface RoomMemory {
+  roomName: string;
   state: RoomState;
   buildQueue: BuildMemory[];
   currentBuild?: BuildMemory;

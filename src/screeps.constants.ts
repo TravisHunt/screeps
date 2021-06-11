@@ -11,3 +11,7 @@ export const UPGRADER_MAX = 2;
 export const COURIER_MAX = 1;
 
 export const ROOM_AXIS = 25;
+
+export const REPAIR_THRESHOLD = {
+  [STRUCTURE_WALL]: 1000000
+};

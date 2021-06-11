@@ -65,7 +65,7 @@ export default class RoomManager {
     // Construct a new memory object if this is the first time we're tracking
     // this room.
     if (!this.memory) {
-      this.memory = RoomManager.createRoomMemoryObj();
+      this.memory = RoomManager.createRoomMemoryObj(roomName);
     }
 
     // Migrate from old Memory structure if specified
@@ -228,8 +228,9 @@ export default class RoomManager {
     }
   }
 
-  private static createRoomMemoryObj(): RoomMemory {
+  private static createRoomMemoryObj(roomName: string): RoomMemory {
     return {
+      roomName,
       state: {
         spawnAdjacentWalkways: { inprogress: false, complete: false },
         roadFromSpawnToCtrl: { inprogress: false, complete: false },
