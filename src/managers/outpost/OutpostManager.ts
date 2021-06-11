@@ -30,60 +30,17 @@ export default class OutpostManager {
     // For each outpost flag found, check if we're tracking this outpost.
     // TODO: What happens if an outpost flag is removed?
     for (const flag of outpostFlags) {
-      const exitsInQuad = this.room.findWithinQuadrant(
-        FIND_EXIT,
-        flag.pos.quadrant()
-      );
-      console.log(`${flag.name} exits: ${JSON.stringify(exitsInQuad)}`);
       if (flag.name in this.outposts === false) {
-        // Find quadrant to search for exits or guard targets
-        const quadrant = flag.pos.quadrant();
+        // Find all exits in the flag's quadrant of its room.
+        const guardPositions = this.room.findWithinQuadrant(
+          FIND_EXIT,
+          flag.pos.quadrant()
+        );
 
         // TODO: implement guarding specific targets indicated by some kind
         // of flag. e.g, look for objects in room with "guarded" flag.
-        const axis = 25;
-        const allExits = this.room.find(FIND_EXIT);
-        let guardPositions: RoomPosition[] = [];
 
-        if (quadrant === QUADRANT.I) {
-          guardPositions = allExits.filter(p => p.x >= axis && p.y >= axis);
-        } else if (quadrant === QUADRANT.II) {
-          guardPositions = allExits.filter(p => p.x < axis && p.y >= axis);
-        } else if (quadrant === QUADRANT.III) {
-          guardPositions = allExits.filter(p => p.x < axis && p.y < axis);
-        } else if (quadrant === QUADRANT.IV) {
-          guardPositions = allExits.filter(p => p.x >= axis && p.y < axis);
-        }
-
-        let perimeter: Perimeter | undefined;
-
-        // Construct a perimeter containing the guard positions
-        if (guardPositions.length) {
-          // Find min and max axis values using guard positions and outpost
-          // range constant.
-          const minX = Math.min(
-            flag.pos.x - OUTPOST_RANGE,
-            guardPositions.sort((p1, p2) => p1.x - p2.x)[0].x
-          );
-          const maxX = Math.max(
-            flag.pos.x + OUTPOST_RANGE,
-            guardPositions.sort((p1, p2) => p1.x - p2.x).reverse()[0].x
-          );
-          const minY = Math.min(
-            flag.pos.y - OUTPOST_RANGE,
-            guardPositions.sort((p1, p2) => p1.y - p2.y)[0].y
-          );
-          const maxY = Math.max(
-            flag.pos.y + OUTPOST_RANGE,
-            guardPositions.sort((p1, p2) => p1.y - p2.y).reverse()[0].y
-          );
-
-          // Construct outpost perimeter that includes guard positions
-          perimeter = {
-            x: { min: minX, max: maxX },
-            y: { min: minY, max: maxY }
-          };
-        }
+        const perimeter = flag.pos.perimeter(OUTPOST_RANGE, guardPositions);
 
         // Save new outpost to memory and run-time list
         this.memory.outposts[flag.name] = Outpost.createMemory(

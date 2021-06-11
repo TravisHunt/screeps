@@ -1,10 +1,5 @@
 import { Dictionary } from "lodash";
-import { QUADRANT } from "utils/enums";
-import {
-  findTypeHasPosition,
-  findTypeIsPosition,
-  hasPos
-} from "utils/typeGuards";
+import { findTypeHasPosition, findTypeIsPosition } from "utils/typeGuards";
 
 /**
  * Room prototypes - commonly used properties
