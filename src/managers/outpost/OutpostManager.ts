@@ -1,7 +1,6 @@
 import { OUTPOST_NAME_PREFIX, OUTPOST_RANGE, debug } from "screeps.constants";
 import DeliveryService from "services/DeliveryService";
 import Outpost from "./Outpost";
-import { QUADRANT } from "utils/enums";
 
 export default class OutpostManager {
   public room: Room;

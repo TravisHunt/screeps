@@ -1,6 +1,7 @@
 import ManagerBase from "managers/base.manager";
 import * as constants from "screeps.constants";
 import ResourceService from "services/ResourceService";
+import XPARTS from "utils/XPARTS";
 
 export default class HarvestManager extends ManagerBase {
   public static readonly roleHarvester = "harvester";
@@ -95,16 +96,22 @@ export default class HarvestManager extends ManagerBase {
     if (this.harvesters.length < this.harvesterMax && !spawn.spawning) {
       // TODO: get parts based on spawn capacity
       const name = `Harvester${Game.time}`;
-      const parts = [WORK, CARRY, MOVE];
-      const big = [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+      const babyBoi = [WORK, CARRY, MOVE];
+      const mediumBoi = XPARTS([WORK, 2], [CARRY, 3], [MOVE, 4]);
+      const bigBoi = XPARTS([WORK, 5], [CARRY, 6], [MOVE, 6]);
 
       console.log(`Spawning new harvester: ${name}`);
-      const res = spawn.spawnCreep(big, name, {
+      let res = spawn.spawnCreep(bigBoi, name, {
         memory: { role: HarvestManager.roleHarvester, harvesting: false }
       });
 
       if (res === ERR_NOT_ENOUGH_ENERGY) {
-        spawn.spawnCreep(parts, name, {
+        res = spawn.spawnCreep(mediumBoi, name, {
+          memory: { role: HarvestManager.roleHarvester, harvesting: false }
+        });
+      }
+      if (res === ERR_NOT_ENOUGH_ENERGY) {
+        res = spawn.spawnCreep(babyBoi, name, {
           memory: { role: HarvestManager.roleHarvester, harvesting: false }
         });
       }
