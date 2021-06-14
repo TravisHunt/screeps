@@ -304,6 +304,22 @@ export default class RoomManager {
       .map(s => s.id as Id<StructureWall>);
   }
 
+  private linkIsPaired(link: StructureLink): boolean {
+    const pairs = [this.controllerLink];
+    let match = false;
+
+    for (const pair of pairs) {
+      match =
+        pair !== undefined
+          ? link.id === pair.sender.id || link.id === pair.receiver.id
+          : false;
+
+      if (match) break;
+    }
+
+    return match;
+  }
+
   private refreshSourceToCtrlLink() {
     // Controller must be >= level 5 to consider links.
     if (!this.room.controller || this.room.controller.level < 5) return;
@@ -313,12 +329,9 @@ export default class RoomManager {
 
     // Be sure to remove a link id if it was destroyed.
     if (this.memory.controllerLink) {
-      if (this.memory.controllerLink.a) {
-        sourceLink = Game.getObjectById(this.memory.controllerLink.a);
-      }
-      if (this.memory.controllerLink.b) {
-        controllerLink = Game.getObjectById(this.memory.controllerLink.b);
-      }
+      [sourceLink, controllerLink] = OneWayLink.getPairFrom(
+        this.memory.controllerLink
+      );
     }
 
     // We don't have a source link. Scan for one.
@@ -327,7 +340,7 @@ export default class RoomManager {
         const found = src.pos.findInRange(FIND_MY_STRUCTURES, OUTPOST_RANGE, {
           filter: { structureType: STRUCTURE_LINK }
         });
-        console.log(JSON.stringify(found));
+
         if (found.length) {
           sourceLink = found[0] as StructureLink;
           break;

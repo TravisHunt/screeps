@@ -1,5 +1,6 @@
 interface Memory {
   version: string;
+  statistics: IStatistics;
   logs: string[];
   rooms: Record<string, RoomMemory>;
   maintenance: Record<string, MaintenanceServiceMemory>;
@@ -14,6 +15,7 @@ interface CreepMemory {
   origin?: string;
   contract?: ResourceDeliveryContract;
   ownerTag?: string;
+  repairTargetId?: Id<AnyStructure>;
 }
 
 interface BuildTracking {
@@ -64,3 +66,7 @@ interface Coordinate {
 type LookPerimeterArray<
   T extends keyof AllLookAtTypes
 > = LookForAtAreaResultArray<AllLookAtTypes[T], T>;
+
+interface IRepairTask<T> {
+  id: Id<T>;
+}

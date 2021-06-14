@@ -4,6 +4,7 @@ import "prototypes/Creep";
 import { ErrorMapper } from "utils/ErrorMapper";
 import RoomManager from "managers/room/RoomManager";
 import MaintenanceService from "services/MaintenanceService";
+import StatisticsService from "services/StatisticsServices";
 import { USERNAME } from "screeps.constants";
 
 const currentVersion = "0.0.2";
@@ -52,4 +53,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   // Run maintenance jobs and process maintenance requests
   const maintenanceService = MaintenanceService.getInstance();
   maintenanceService.run();
+
+  const statsService = StatisticsService.getInstance();
+  statsService.run();
 });

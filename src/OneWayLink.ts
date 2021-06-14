@@ -54,6 +54,22 @@ export default class OneWayLink {
     );
   }
 
+  public static getPairFrom(
+    memory: LinkPairMemory
+  ): [StructureLink | null, StructureLink | null] {
+    let linkA: StructureLink | null = null;
+    let linkB: StructureLink | null = null;
+
+    if (memory.a) linkA = Game.getObjectById(memory.a);
+    if (memory.b) linkB = Game.getObjectById(memory.b);
+
+    return [linkA, linkB];
+  }
+
+  public contains(link: StructureLink): boolean {
+    return link.id === this.sender.id || link.id === this.receiver.id;
+  }
+
   /**
    * Initiates a transfer of energy from the Creep to the sender link.
    * @param creep - Creep transferring energy to sender

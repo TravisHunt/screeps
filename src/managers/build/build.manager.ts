@@ -151,29 +151,18 @@ export default class BuildManager extends ManagerBase {
    * @param creep - Repairman
    */
   private repair(creep: Creep, spawn: StructureSpawn): void {
+    if (creep.ticksToLive && creep.ticksToLive < constants.RENEW_THRESHOLD) {
+      if (spawn.renewCreep(creep) === ERR_NOT_IN_RANGE) {
+        creep.moveTo(spawn);
+      }
+      return;
+    }
+
     // Harvest if you have no more energy
     if (
       !creep.memory.harvesting &&
       creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
-      // Should I renew?
-      const shouldRenew =
-        creep.ticksToLive && creep.ticksToLive < constants.RENEW_THRESHOLD;
-      const creepSize = creep.body.length;
-      const creepCost = creep.body
-        .map(part => BODYPART_COST[part.type])
-        .reduce((total, val) => total + val);
-      const renewCost = Math.ceil(creepCost / 2.5 / creepSize);
-      console.log(
-        `Should renew: ${shouldRenew ? "YES" : "NO"}, Renew cost: ${renewCost}`
-      );
-      if (shouldRenew && spawn.store[RESOURCE_ENERGY] > renewCost) {
-        if (spawn.renewCreep(creep) === ERR_NOT_IN_RANGE) {
-          creep.moveTo(spawn);
-          return;
-        }
-      }
-
       creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
@@ -192,27 +181,22 @@ export default class BuildManager extends ManagerBase {
       return;
     }
 
-    const storage =
-      this.room.storage &&
-      this.room.storage.hits < this.room.storage.hitsMax * 0.75
-        ? this.room.storage
-        : undefined;
-    const container = this.room
-      .find(FIND_STRUCTURES, {
-        filter: s =>
-          s.hits < s.hitsMax * 0.75 && s.structureType === STRUCTURE_CONTAINER
-      })
-      .shift();
-
-    const target =
-      storage ||
-      container ||
-      this.room
+    let target: AnyStructure | undefined | null;
+    if (creep.memory.repairTargetId) {
+      target = Game.getObjectById(creep.memory.repairTargetId);
+      if (target && target.hits >= target.hitsMax * 0.75) target = null;
+    }
+    if (!target) {
+      target = this.room
         .find(FIND_STRUCTURES, {
-          filter: object => object.hits < object.hitsMax
+          filter: object => object.hits < object.hitsMax * 0.75
         })
         .sort((a, b) => a.hits - b.hits)
         .shift();
+      if (target) {
+        creep.memory.repairTargetId = target.id;
+      }
+    }
 
     if (target && creep.repair(target) === ERR_NOT_IN_RANGE) {
       creep.moveTo(target, {
@@ -619,7 +603,10 @@ export default class BuildManager extends ManagerBase {
 
       // For each source, create a job to build a road from the spawn to the source
       sources.forEach(source => {
-        const path = this.room.findPath(spawn.pos, source.pos, { range: 1 });
+        const path = this.room.findPath(spawn.pos, source.pos, {
+          range: 1,
+          ignoreCreeps: true
+        });
         paths.push(path);
       });
 
@@ -667,7 +654,10 @@ export default class BuildManager extends ManagerBase {
 
       // Add a new job to this room's schedule
       const ctrlPos = this.room.controller.pos;
-      const job = this.buildRoadFromTo(spawn.pos, ctrlPos, { range: 1 });
+      const job = this.buildRoadFromTo(spawn.pos, ctrlPos, {
+        range: 1,
+        ignoreCreeps: true
+      });
 
       // Link new job to the room's state
       jobState.jobId = job.id;

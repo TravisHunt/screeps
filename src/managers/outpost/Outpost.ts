@@ -310,9 +310,9 @@ export default class Outpost extends ManagedLocation {
           }
         } else {
           // Fill towers
-          const tower = this.towers
-            .filter(t => t.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
-            .shift();
+          const tower = this.towers.find(
+            t => t.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+          );
 
           if (tower) {
             if (
@@ -323,10 +323,20 @@ export default class Outpost extends ManagedLocation {
             return;
           }
 
+          // Repair containers
+          const container = this.containers.find(c => c.hits < c.hitsMax);
+
+          if (container) {
+            if (attendant.repair(container) === ERR_NOT_IN_RANGE) {
+              attendant.moveTo(container);
+            }
+            return;
+          }
+
           // Repair ramparts
           const rampart = this.ramparts
             .sort((a, b) => a.hits - b.hits)
-            .find(r => r.hits < r.hitsMax);
+            .find(r => r.hits < REPAIR_THRESHOLD[STRUCTURE_RAMPART]);
 
           if (rampart) {
             if (attendant.repair(rampart) === ERR_NOT_IN_RANGE) {
@@ -405,15 +415,13 @@ export default class Outpost extends ManagedLocation {
       } else if (towerAction === "repair") {
         const rampart = this.ramparts
           .sort((a, b) => a.hits - b.hits)
-          .filter(r => r.hits < r.hitsMax)
-          .shift();
+          .find(r => r.hits < REPAIR_THRESHOLD[STRUCTURE_RAMPART]);
         if (rampart) {
           this.towers.forEach(t => t.repair(rampart));
         } else {
           const wall = this.walls
-            .filter(w => w.hits < REPAIR_THRESHOLD[STRUCTURE_WALL])
             .sort((a, b) => a.hits - b.hits)
-            .shift();
+            .find(w => w.hits < REPAIR_THRESHOLD[STRUCTURE_WALL]);
 
           if (wall) {
             this.towers.forEach(t => t.repair(wall));

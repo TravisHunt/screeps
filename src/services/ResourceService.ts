@@ -1,4 +1,5 @@
 import HarvestQueue from "managers/resource/HarvestQueue";
+import StatisticsService from "services/StatisticsServices";
 import {
   ERR_CREEP_SPAWNING,
   ERR_RESOURCE_NOT_IMPLEMENTED,
@@ -28,6 +29,7 @@ export default class ResourceService {
   private controllerLink?: OneWayLink;
   private harvestQueue: HarvestQueue;
   private sourceService: SourceService;
+  private statService: StatisticsService;
 
   public constructor(
     room: Room,
@@ -53,6 +55,7 @@ export default class ResourceService {
     this.couriers = couriers;
     this.harvestQueue = harvestQueue;
     this.controllerLink = controllerLink;
+    this.statService = StatisticsService.getInstance();
     this.sourceService = new SourceService(
       this.room,
       this.sources,
@@ -209,8 +212,18 @@ export default class ResourceService {
       this.room.storage &&
       this.room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0
     ) {
+      const energyBefore = creep.store[RESOURCE_ENERGY];
       target = this.room.storage;
       retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
+      if (retCode === OK) {
+        const energyAfter = creep.store[RESOURCE_ENERGY];
+        this.statService.logStorageWithdraw(
+          target,
+          creep.memory.role,
+          RESOURCE_ENERGY,
+          energyBefore - energyAfter
+        );
+      }
     }
 
     if (!target || !retCode) return ERR_FULL;
