@@ -13,6 +13,7 @@ interface ManagedStationMemory<Type> {
   stationId: Id<Type>;
   positions: OccupiablePosition[];
   maintenanceCrewNames: string[];
+  linkId?: Id<StructureLink>;
 }
 
 type Concrete<Type> = {

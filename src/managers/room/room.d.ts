@@ -18,7 +18,9 @@ interface RoomMemory {
   towerIds: Id<StructureTower>[];
   wallIds: Id<StructureWall>[];
   outposts: Record<string, OutpostMemory>;
-  controllerLink?: LinkPairMemory;
+  upgradeLink?: Id<StructureLink>;
+  storageLink?: Id<StructureLink>;
+  sourceLinks: Id<StructureLink>[];
 }
 
 interface RoomConfig {

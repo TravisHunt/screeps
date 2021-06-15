@@ -36,6 +36,16 @@ declare global {
      * @param type - Type of structure
      */
     lookForStructure(type: StructureConstant): Structure | undefined;
+
+    findStructuresInRange(
+      type: StructureConstant,
+      range: number
+    ): AnyStructure[];
+
+    findMyStructuresInRange(
+      type: StructureConstant,
+      range: number
+    ): AnyOwnedStructure[];
   }
 }
 
@@ -102,6 +112,18 @@ RoomPosition.prototype.inPerimeter = function (perimeter) {
 
 RoomPosition.prototype.lookForStructure = function (type) {
   return _.find(this.lookFor(LOOK_STRUCTURES), s => s.structureType === type);
+};
+
+RoomPosition.prototype.findStructuresInRange = function (type, range) {
+  return this.findInRange(FIND_STRUCTURES, range, {
+    filter: { structureType: type }
+  });
+};
+
+RoomPosition.prototype.findMyStructuresInRange = function (type, range) {
+  return this.findInRange(FIND_MY_STRUCTURES, range, {
+    filter: { structureType: type }
+  });
 };
 
 export {};

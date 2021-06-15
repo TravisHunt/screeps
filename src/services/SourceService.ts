@@ -54,6 +54,23 @@ export default class SourceService {
     return count;
   }
 
+  public getLinks(): StructureLink[] {
+    const links: StructureLink[] = [];
+    this.managedSources.forEach(ms => {
+      if (ms.link !== undefined) links.push(ms.link);
+    });
+    return links;
+  }
+
+  public getReadyFullLink(): StructureLink | undefined {
+    for (const src of this.managedSources) {
+      if (src.link && src.link.ready() && src.link.full()) {
+        return src.link;
+      }
+    }
+    return;
+  }
+
   public run(): void {
     // Run harvest jobs for creeps occupying harvest positions.
     // Clear occupied spaces where the occupier is done harvesting.

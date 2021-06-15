@@ -1,3 +1,4 @@
+import { OUTPOST_RANGE } from "screeps.constants";
 import { Identifiable } from "utils/typeGuards";
 
 export default abstract class ManagedStation<Type extends RoomObject> {
@@ -7,11 +8,16 @@ export default abstract class ManagedStation<Type extends RoomObject> {
   protected room: Room;
   protected _positions: OccupiablePosition[];
   protected maintenanceCrew: Creep[] = [];
+  protected _link?: StructureLink;
 
   public constructor(mem: ManagedStationMemory<Type>) {
     this.memory = mem;
     this._positions = mem.positions;
     this.room = Game.rooms[mem.roomName];
+
+    const station = Game.getObjectById(mem.stationId);
+    if (station) this.station = station;
+    else throw new Error(`ManagedStation: no store with id ${mem.stationId}`);
 
     // Account for objects that existed before this change.
     if (mem.maintenanceCrewNames === undefined) mem.maintenanceCrewNames = [];
@@ -25,9 +31,21 @@ export default abstract class ManagedStation<Type extends RoomObject> {
     // Filter out dead names
     this.memory.maintenanceCrewNames = this.maintenanceCrew.map(c => c.name);
 
-    const station = Game.getObjectById(mem.stationId);
-    if (station) this.station = station;
-    else throw new Error(`ManagedStation: no store with id ${mem.stationId}`);
+    // Check for link
+    if (mem.linkId) {
+      const link = Game.getObjectById(mem.linkId);
+      if (!link) mem.linkId = undefined;
+      else this._link = link;
+    }
+    if (!this._link) {
+      const link = this.station.pos
+        .findMyStructuresInRange(STRUCTURE_LINK, OUTPOST_RANGE)
+        .shift() as StructureLink | undefined;
+      if (link) {
+        mem.linkId = link.id;
+        this._link = link;
+      }
+    }
   }
 
   public abstract run(): StationInsights;
@@ -73,6 +91,10 @@ export default abstract class ManagedStation<Type extends RoomObject> {
     }
 
     return roadsToRepair;
+  }
+
+  public get link(): StructureLink | undefined {
+    return this._link;
   }
 
   public getAvailablePosition(): OccupiablePosition | undefined {

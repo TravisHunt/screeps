@@ -5,7 +5,6 @@ import Outpost from "managers/outpost/Outpost";
 import OutpostManager from "managers/outpost/OutpostManager";
 import HarvestQueue from "managers/resource/HarvestQueue";
 import UpgradeManager from "managers/upgrade.manager";
-import OneWayLink from "OneWayLink";
 import {
   BUILDER_MAX,
   COURIER_MAX,
@@ -31,7 +30,8 @@ export default class RoomManager {
   private outposts: Record<string, Outpost> = {};
   private harvestQueue: HarvestQueue;
   private deliveryQueue: Queue<ResourceRequestFromBucket>;
-  private controllerLink?: OneWayLink;
+  private upgradeLink?: StructureLink;
+  private storageLink?: StructureLink;
   private resourceService: ResourceService;
   private outpostService: OutpostManager;
   private deliveryService: DeliveryService;
@@ -76,8 +76,8 @@ export default class RoomManager {
     // Rescan for sources and store structures
     this.refreshIdCollections();
 
-    // Check for energy link from source to controller
-    this.refreshSourceToCtrlLink();
+    // Check for energy links
+    this.refreshLinks();
 
     // Build from stored ids
     this.sources = RoomManager.idsToObjects(this.memory.sourceIds);
@@ -102,19 +102,6 @@ export default class RoomManager {
       this.memory.deliveryQueue
     );
 
-    // gather links
-    if (this.memory.controllerLink) {
-      const srcLink = this.memory.controllerLink.a
-        ? Game.getObjectById(this.memory.controllerLink.a)
-        : null;
-      const controllerLink = this.memory.controllerLink.b
-        ? Game.getObjectById(this.memory.controllerLink.b)
-        : null;
-
-      if (srcLink && controllerLink)
-        this.controllerLink = new OneWayLink(srcLink, controllerLink);
-    }
-
     // Build outpost instances
     for (const name in this.memory.outposts) {
       this.outposts[name] = Outpost.getInstance(this.memory.outposts[name]);
@@ -124,15 +111,13 @@ export default class RoomManager {
     this.resourceService = new ResourceService(
       this.room,
       this.sources,
-      this.spawns,
       this.extensions,
       this.containers,
       this.storages,
-      this.terminals,
-      this.couriers,
       this.harvestQueue,
       this.memory,
-      this.controllerLink
+      this.upgradeLink,
+      this.storageLink
     );
 
     // Init Balancer
@@ -257,6 +242,7 @@ export default class RoomManager {
       rampartIds: [],
       towerIds: [],
       wallIds: [],
+      sourceLinks: [],
 
       outposts: {}
     };
@@ -304,69 +290,49 @@ export default class RoomManager {
       .map(s => s.id as Id<StructureWall>);
   }
 
-  private linkIsPaired(link: StructureLink): boolean {
-    const pairs = [this.controllerLink];
-    let match = false;
-
-    for (const pair of pairs) {
-      match =
-        pair !== undefined
-          ? link.id === pair.sender.id || link.id === pair.receiver.id
-          : false;
-
-      if (match) break;
-    }
-
-    return match;
-  }
-
-  private refreshSourceToCtrlLink() {
+  private refreshLinks() {
     // Controller must be >= level 5 to consider links.
     if (!this.room.controller || this.room.controller.level < 5) return;
 
-    let sourceLink: StructureLink | null = null;
-    let controllerLink: StructureLink | null = null;
+    let upgradeLink: StructureLink | null = null;
+    let storageLink: StructureLink | null = null;
 
-    // Be sure to remove a link id if it was destroyed.
-    if (this.memory.controllerLink) {
-      [sourceLink, controllerLink] = OneWayLink.getPairFrom(
-        this.memory.controllerLink
-      );
+    // Ensure links weren't destroyed
+    if (this.memory.upgradeLink) {
+      upgradeLink = Game.getObjectById(this.memory.upgradeLink);
+      if (!upgradeLink) this.memory.upgradeLink = undefined;
+      else this.upgradeLink = upgradeLink;
+    }
+    if (this.memory.storageLink) {
+      storageLink = Game.getObjectById(this.memory.storageLink);
+      if (!storageLink) this.memory.storageLink = undefined;
+      else this.storageLink = storageLink;
     }
 
-    // We don't have a source link. Scan for one.
-    if (!sourceLink) {
-      for (const src of this.sources) {
-        const found = src.pos.findInRange(FIND_MY_STRUCTURES, OUTPOST_RANGE, {
-          filter: { structureType: STRUCTURE_LINK }
-        });
-
-        if (found.length) {
-          sourceLink = found[0] as StructureLink;
-          break;
+    // Scan for controller upgrade link
+    if (!upgradeLink) {
+      if (this.room.controller) {
+        const link = this.room.controller.pos
+          .findMyStructuresInRange(STRUCTURE_LINK, OUTPOST_RANGE)
+          .shift() as StructureLink | undefined;
+        if (link) {
+          this.memory.upgradeLink = link.id;
+          this.upgradeLink = link;
         }
       }
     }
 
-    // We don't have a controller link. Scan for one.
-    if (!controllerLink) {
-      const found = this.room.controller.pos.findInRange(
-        FIND_MY_STRUCTURES,
-        OUTPOST_RANGE,
-        { filter: { structureType: STRUCTURE_LINK } }
-      );
-
-      if (found.length) controllerLink = found[0] as StructureLink;
-    }
-
-    // If we have at least half the link, track it.
-    if (sourceLink && controllerLink) {
-      this.memory.controllerLink = {
-        a: sourceLink ? sourceLink.id : null,
-        b: controllerLink ? controllerLink.id : null
-      };
-    } else {
-      delete this.memory.controllerLink;
+    // Scan for storage link
+    if (!storageLink) {
+      if (this.room.storage) {
+        const link = this.room.storage.pos
+          .findMyStructuresInRange(STRUCTURE_LINK, OUTPOST_RANGE)
+          .shift() as StructureLink | undefined;
+        if (link) {
+          this.memory.storageLink = link.id;
+          this.storageLink = link;
+        }
+      }
     }
   }
 }

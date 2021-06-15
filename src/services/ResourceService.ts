@@ -5,7 +5,6 @@ import {
   ERR_RESOURCE_NOT_IMPLEMENTED,
   ResourceReturnCode
 } from "managers/resource/utils";
-import OneWayLink from "OneWayLink";
 import SourceService from "./SourceService";
 import * as utils from "../managers/resource/utils";
 import * as palette from "../palette";
@@ -20,13 +19,11 @@ export default class ResourceService {
   private memory: RoomMemory;
   private room: Room;
   private sources: Source[] = [];
-  private spawns: StructureSpawn[] = [];
   private extensions: StructureExtension[] = [];
   private containers: StructureContainer[] = [];
   private storages: StructureStorage[] = [];
-  private terminals: StructureTerminal[] = [];
-  private couriers: Creep[] = [];
-  private controllerLink?: OneWayLink;
+  private upgradeLink?: StructureLink;
+  private storageLink?: StructureLink;
   private harvestQueue: HarvestQueue;
   private sourceService: SourceService;
   private statService: StatisticsService;
@@ -34,27 +31,23 @@ export default class ResourceService {
   public constructor(
     room: Room,
     sources: Source[],
-    spawns: StructureSpawn[],
     extensions: StructureExtension[],
     containers: StructureContainer[],
     storages: StructureStorage[],
-    terminals: StructureTerminal[],
-    couriers: Creep[],
     harvestQueue: HarvestQueue,
     memory: RoomMemory,
-    controllerLink?: OneWayLink
+    upgradeLink?: StructureLink,
+    storageLink?: StructureLink
   ) {
     this.memory = memory;
     this.room = room;
     this.sources = sources;
-    this.spawns = spawns;
     this.extensions = extensions;
     this.containers = containers;
     this.storages = storages;
-    this.terminals = terminals;
-    this.couriers = couriers;
     this.harvestQueue = harvestQueue;
-    this.controllerLink = controllerLink;
+    this.upgradeLink = upgradeLink;
+    this.storageLink = storageLink;
     this.statService = StatisticsService.getInstance();
     this.sourceService = new SourceService(
       this.room,
@@ -72,9 +65,22 @@ export default class ResourceService {
     // Run harvest jobs for creeps occupying harvest positions of sources.
     this.sourceService.run();
 
-    // Transfer energy to controller over link if we have one.
-    if (this.controllerLink && this.controllerLink.readyToSend) {
-      this.controllerLink.send();
+    // Do we have an empty upgrade link?
+    if (this.upgradeLink && this.upgradeLink.freeCapacity() > 0) {
+      // Any full source links?
+      const srcLink = this.sourceService.getReadyFullLink();
+      if (srcLink) {
+        srcLink.transferEnergy(this.upgradeLink);
+      }
+    }
+
+    // Do we have an empty storage link?
+    if (this.storageLink && this.storageLink.freeCapacity() > 0) {
+      // Any full source links?
+      const srcLink = this.sourceService.getReadyFullLink();
+      if (srcLink) {
+        srcLink.transferEnergy(this.storageLink);
+      }
     }
   }
 
@@ -130,13 +136,13 @@ export default class ResourceService {
     if (
       opts &&
       opts.upgrading &&
-      this.controllerLink &&
-      !this.controllerLink.receiverEmpty
+      this.upgradeLink &&
+      !this.upgradeLink.empty()
     ) {
       return ResourceService.creepWithdrawFrom(
         requestor,
         RESOURCE_ENERGY,
-        this.controllerLink.receiver,
+        this.upgradeLink,
         opts && opts.amount
       );
     }
@@ -184,45 +190,50 @@ export default class ResourceService {
     let target: AnyStoreStructure | undefined;
     let retCode: ScreepsReturnCode | undefined;
 
-    const spawnsWithSpace = this.spawns.filter(
-      s => s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-    );
     const extWithSpace = this.extensions.filter(
       ext => ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0
     );
 
     // Deposit location priority
-    // 1) Spawns
+    // 1) Source links
     // 2) Extensions
-    // 3) Controller link
-    // 4) Storage
-    if (spawnsWithSpace.length) {
-      target = spawnsWithSpace[0];
-      retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
-    } else if (extWithSpace.length) {
-      target = extWithSpace[0];
-      retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
-    } else if (
-      this.controllerLink &&
-      this.controllerLink.senderFreeCapacity > 0
-    ) {
-      target = this.controllerLink.sender;
-      retCode = this.controllerLink.transfer(creep, opts);
-    } else if (
-      this.room.storage &&
-      this.room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-    ) {
-      const energyBefore = creep.store[RESOURCE_ENERGY];
-      target = this.room.storage;
-      retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
-      if (retCode === OK) {
-        const energyAfter = creep.store[RESOURCE_ENERGY];
-        this.statService.logStorageWithdraw(
-          target,
-          creep.memory.role,
-          RESOURCE_ENERGY,
-          energyBefore - energyAfter
-        );
+    // 3) Storage
+    const srcLinks = this.sourceService.getLinks();
+
+    if (srcLinks.length) {
+      for (const link of srcLinks) {
+        if (!link.full()) {
+          target = link;
+          retCode = creep.transfer(
+            target,
+            RESOURCE_ENERGY,
+            opts && opts.amount
+          );
+          break;
+        }
+      }
+    }
+
+    if (!target && !retCode) {
+      if (extWithSpace.length) {
+        target = extWithSpace[0];
+        retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
+      } else if (
+        this.room.storage &&
+        this.room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+      ) {
+        const energyBefore = creep.store[RESOURCE_ENERGY];
+        target = this.room.storage;
+        retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
+        if (retCode === OK) {
+          const energyAfter = creep.store[RESOURCE_ENERGY];
+          this.statService.logStorageWithdraw(
+            target,
+            creep.memory.role,
+            RESOURCE_ENERGY,
+            energyBefore - energyAfter
+          );
+        }
       }
     }
 

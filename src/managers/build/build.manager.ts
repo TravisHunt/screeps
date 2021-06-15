@@ -189,7 +189,10 @@ export default class BuildManager extends ManagerBase {
     if (!target) {
       target = this.room
         .find(FIND_STRUCTURES, {
-          filter: object => object.hits < object.hitsMax * 0.75
+          filter: object =>
+            object.structureType !== STRUCTURE_WALL &&
+            object.structureType !== STRUCTURE_RAMPART &&
+            object.hits < object.hitsMax * 0.75
         })
         .sort((a, b) => a.hits - b.hits)
         .shift();
