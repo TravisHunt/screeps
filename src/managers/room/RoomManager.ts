@@ -9,7 +9,7 @@ import {
   BUILDER_MAX,
   COURIER_MAX,
   HARVESTER_MAX,
-  OUTPOST_RANGE,
+  OWNED_LINK_RANGE,
   REPAIRMAN_MAX,
   UPGRADER_MAX
 } from "screeps.constants";
@@ -313,7 +313,7 @@ export default class RoomManager {
     if (!upgradeLink) {
       if (this.room.controller) {
         const link = this.room.controller.pos
-          .findMyStructuresInRange(STRUCTURE_LINK, OUTPOST_RANGE)
+          .findMyStructuresInRange(STRUCTURE_LINK, OWNED_LINK_RANGE)
           .shift() as StructureLink | undefined;
         if (link) {
           this.memory.upgradeLink = link.id;
@@ -326,7 +326,7 @@ export default class RoomManager {
     if (!storageLink) {
       if (this.room.storage) {
         const link = this.room.storage.pos
-          .findMyStructuresInRange(STRUCTURE_LINK, OUTPOST_RANGE)
+          .findMyStructuresInRange(STRUCTURE_LINK, OWNED_LINK_RANGE)
           .shift() as StructureLink | undefined;
         if (link) {
           this.memory.storageLink = link.id;

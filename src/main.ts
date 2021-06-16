@@ -1,6 +1,7 @@
 import "prototypes/AllImports";
 import { ErrorMapper } from "utils/ErrorMapper";
 import RoomManager from "managers/room/RoomManager";
+import StorageService from "services/StorageService";
 import MaintenanceService from "services/MaintenanceService";
 import StatisticsService from "services/StatisticsServices";
 import { USERNAME } from "screeps.constants";
@@ -28,6 +29,9 @@ export const loop = ErrorMapper.wrapLoop(() => {
   if (!Memory.logs) Memory.logs = [];
   if (!Memory.rooms) Memory.rooms = {};
   if (!Memory.maintenance) Memory.maintenance = {};
+
+  const storageService = StorageService.getInstance();
+  storageService.refresh();
 
   const roomManagers: RoomManager[] = [];
 

@@ -46,6 +46,8 @@ declare global {
       type: StructureConstant,
       range: number
     ): AnyOwnedStructure[];
+
+    distanceTo(to: RoomPosition): number;
   }
 }
 
@@ -124,6 +126,13 @@ RoomPosition.prototype.findMyStructuresInRange = function (type, range) {
   return this.findInRange(FIND_MY_STRUCTURES, range, {
     filter: { structureType: type }
   });
+};
+
+RoomPosition.prototype.distanceTo = function (to) {
+  const a = to.x - this.x;
+  const b = to.y - this.y;
+
+  return Math.sqrt(Math.pow(a, 2) + Math.pow(b, 2));
 };
 
 export {};

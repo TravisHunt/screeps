@@ -1,6 +1,7 @@
 import IRunnable from "interfaces/IRunnable";
 import { RENEW_THRESHOLD } from "screeps.constants";
 import ResourceService from "services/ResourceService";
+import StorageService from "services/StorageService";
 import { EnergyStructure } from "utils/typeGuards";
 import XPARTS from "utils/XPARTS";
 
@@ -17,6 +18,7 @@ export default class Balancer implements IRunnable {
   private extensions: StructureExtension[];
   private balancers: Creep[] = [];
   private resourceService: ResourceService;
+  private storageService: StorageService;
 
   /**
    * A driver whose main goal is distributing resources to structures. It's main
@@ -40,6 +42,7 @@ export default class Balancer implements IRunnable {
     this.extensions = extensions;
     this.balancers = balancers;
     this.resourceService = resourceService;
+    this.storageService = StorageService.getInstance();
   }
 
   /**
@@ -80,6 +83,35 @@ export default class Balancer implements IRunnable {
       // Do not continue if we're still renewing.
       if (creep.memory.renewing) continue;
 
+      // TODO: This code is really sloppy and needs to be cleaned up.
+      if (creep.memory.balancing) {
+        if (creep.energy() === 0) {
+          const link = this.resourceService.getStorageLink();
+          if (link && !link.empty()) {
+            if (creep.withdraw(link, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+              creep.moveTo(link);
+            }
+            continue;
+          } else {
+            creep.memory.balancing = false;
+          }
+        } else {
+          const storage = this.storageService.getNearestStorage(creep.pos);
+          if (storage) {
+            const res = creep.transfer(storage.target, RESOURCE_ENERGY);
+            if (res === ERR_NOT_IN_RANGE) {
+              creep.moveTo(storage.target);
+              continue;
+            } else if (res === ERR_FULL) {
+              creep.memory.balancing = false;
+            }
+          } else {
+            creep.memory.balancing = false;
+          }
+        }
+      }
+      if (creep.memory.balancing) continue;
+
       // Toggle state variables
       if (
         creep.memory.harvesting &&
@@ -96,8 +128,16 @@ export default class Balancer implements IRunnable {
 
       // Gather energy
       if (creep.memory.harvesting) {
-        // This will pull energy from storage (if we have one)
-        this.resourceService.submitResourceRequest(creep, RESOURCE_ENERGY);
+        const link = this.resourceService.getStorageLink();
+        if (link && !link.empty()) {
+          if (creep.withdraw(link, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+            creep.moveTo(link);
+          }
+        } else {
+          // This will pull energy from storage (if we have one)
+          this.resourceService.submitResourceRequest(creep, RESOURCE_ENERGY);
+        }
+
         continue;
       }
 
@@ -128,6 +168,8 @@ export default class Balancer implements IRunnable {
             creep.memory.harvesting = true;
           }
         }
+      } else {
+        creep.memory.balancing = true;
       }
     }
   }

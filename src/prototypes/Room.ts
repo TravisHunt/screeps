@@ -62,6 +62,12 @@ declare global {
       quadrant: number,
       opts?: FilterOptions<F>
     ): FindTypes[F][];
+
+    /**
+     * Find my structures with the given structure type.
+     * @param type - STRUCTURE_* constant
+     */
+    findMyStructures<K extends StructureConstant>(type: K): AnyOwnedStructure[];
   }
 }
 
@@ -160,6 +166,12 @@ Room.prototype.findWithinQuadrant = function (find, quadrant, opts) {
   };
 
   return this.find(find, options);
+};
+
+Room.prototype.findMyStructures = function (type) {
+  return this.find(FIND_MY_STRUCTURES, {
+    filter: { structureType: type }
+  });
 };
 
 export {};

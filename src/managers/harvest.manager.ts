@@ -42,6 +42,28 @@ export default class HarvestManager extends ManagerBase {
 
   private work(harvester: Creep, spawn: StructureSpawn) {
     if (
+      harvester.ticksToLive &&
+      harvester.ticksToLive < constants.RENEW_THRESHOLD
+    ) {
+      harvester.memory.renewing = true;
+    }
+
+    if (harvester.memory.renewing) {
+      const res = spawn.renewCreep(harvester);
+
+      switch (res) {
+        case ERR_NOT_IN_RANGE:
+          harvester.moveTo(spawn);
+          break;
+        case ERR_FULL:
+        case ERR_NOT_ENOUGH_ENERGY:
+          harvester.memory.renewing = false;
+          break;
+      }
+      if (harvester.memory.renewing) return;
+    }
+
+    if (
       harvester.memory.harvesting &&
       harvester.store.getFreeCapacity(RESOURCE_ENERGY) === 0
     ) {
@@ -51,36 +73,8 @@ export default class HarvestManager extends ManagerBase {
       !harvester.memory.harvesting &&
       harvester.store.getUsedCapacity(RESOURCE_ENERGY) === 0
     ) {
-      // Should I renew?
-      if (
-        harvester.ticksToLive &&
-        harvester.ticksToLive < constants.RENEW_THRESHOLD
-      ) {
-        harvester.memory.renewing = true;
-      }
-
-      // Renew until full
-      if (harvester.memory.renewing) {
-        if (!spawn) {
-          harvester.say("Guess I'll Die");
-          harvester.memory.renewing = false;
-        } else {
-          const res = spawn.renewCreep(harvester);
-
-          switch (res) {
-            case ERR_NOT_IN_RANGE:
-              harvester.moveTo(spawn);
-              break;
-            case ERR_FULL:
-            case ERR_NOT_ENOUGH_ENERGY:
-              harvester.memory.renewing = false;
-              break;
-          }
-        }
-      } else {
-        harvester.memory.harvesting = true;
-        harvester.say("🔄 harvest");
-      }
+      harvester.memory.harvesting = true;
+      harvester.say("🔄 harvest");
     }
 
     if (harvester.memory.harvesting) {

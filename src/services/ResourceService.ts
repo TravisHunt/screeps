@@ -28,6 +28,14 @@ export default class ResourceService {
   private sourceService: SourceService;
   private statService: StatisticsService;
 
+  public getUpgradeLink(): StructureLink | undefined {
+    return this.upgradeLink;
+  }
+
+  public getStorageLink(): StructureLink | undefined {
+    return this.storageLink;
+  }
+
   public constructor(
     room: Room,
     sources: Source[],

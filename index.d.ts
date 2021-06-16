@@ -4,12 +4,18 @@ interface Memory {
   logs: string[];
   rooms: Record<string, RoomMemory>;
   maintenance: Record<string, MaintenanceServiceMemory>;
+  storageService: StorageServiceMemory;
+}
+
+interface StorageServiceMemory {
+  [x: string]: Id<StructureStorage>[];
 }
 
 interface CreepMemory {
   role: string;
   harvesting?: boolean;
   renewing?: boolean;
+  balancing?: boolean;
   jobId?: number;
   buildTarget?: Id<ConstructionSite>;
   origin?: string;
