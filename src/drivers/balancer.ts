@@ -1,8 +1,7 @@
-import IRunnable from "interfaces/IRunnable";
 import { RENEW_THRESHOLD } from "screeps.constants";
 import ResourceService from "services/ResourceService";
 import StorageService from "services/StorageService";
-import { EnergyStructure } from "utils/typeGuards";
+import { EnergyStructure, StoreStructure } from "utils/typeGuards";
 import XPARTS from "utils/XPARTS";
 
 /**
@@ -19,6 +18,7 @@ export default class Balancer implements IRunnable {
   private balancers: Creep[] = [];
   private resourceService: ResourceService;
   private storageService: StorageService;
+  private room: Room;
 
   /**
    * A driver whose main goal is distributing resources to structures. It's main
@@ -31,12 +31,14 @@ export default class Balancer implements IRunnable {
    * @param resourceService - ResourceService instance for room
    */
   public constructor(
+    room: Room,
     memory: RoomMemory,
     spawns: StructureSpawn[],
     extensions: StructureExtension[],
     balancers: Creep[],
     resourceService: ResourceService
   ) {
+    this.room = room;
     this.memory = memory;
     this.spawns = spawns;
     this.extensions = extensions;
@@ -83,6 +85,8 @@ export default class Balancer implements IRunnable {
       // Do not continue if we're still renewing.
       if (creep.memory.renewing) continue;
 
+      const storage = this.storageService.getNearestStorage(creep.pos);
+
       // TODO: This code is really sloppy and needs to be cleaned up.
       if (creep.memory.balancing) {
         if (creep.energy() === 0) {
@@ -96,7 +100,6 @@ export default class Balancer implements IRunnable {
             creep.memory.balancing = false;
           }
         } else {
-          const storage = this.storageService.getNearestStorage(creep.pos);
           if (storage) {
             const res = creep.transfer(storage.target, RESOURCE_ENERGY);
             if (res === ERR_NOT_IN_RANGE) {
@@ -141,7 +144,7 @@ export default class Balancer implements IRunnable {
         continue;
       }
 
-      let needsEnergy: EnergyStructure | undefined;
+      let needsEnergy: StoreStructure | EnergyStructure | undefined;
 
       // Prioritize spawns that aren't full.
       needsEnergy = this.spawns.find(
@@ -153,6 +156,14 @@ export default class Balancer implements IRunnable {
         needsEnergy = this.extensions.find(
           e => e.store[RESOURCE_ENERGY] < e.store.getCapacity(RESOURCE_ENERGY)
         );
+      }
+
+      // Do we have a terminal?
+      if (!needsEnergy && storage && storage.reservesMet()) {
+        const terminal = this.room.terminal;
+        if (terminal && terminal.store[RESOURCE_ENERGY]) {
+          needsEnergy = terminal;
+        }
       }
 
       // NOTE: Add more energy balancing targets here.

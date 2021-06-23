@@ -9,6 +9,9 @@ declare global {
     inRampart(): boolean;
     energy(): number;
     energyCapacity(): number;
+    freeCapacity(type?: ResourceConstant): number;
+    usedCapacity(type?: ResourceConstant): number;
+    renewalCost(): number;
   }
 }
 
@@ -22,6 +25,23 @@ Creep.prototype.energy = function () {
 
 Creep.prototype.energyCapacity = function () {
   return this.store.getCapacity(RESOURCE_ENERGY);
+};
+
+Creep.prototype.freeCapacity = function (type) {
+  return this.store.getFreeCapacity(type);
+};
+
+Creep.prototype.usedCapacity = function (type) {
+  return this.store.getUsedCapacity(type);
+};
+
+Creep.prototype.renewalCost = function () {
+  const creepSize = this.body.length;
+  const bodyCost = this.body
+    .map(part => BODYPART_COST[part.type])
+    .reduce((total, val) => total + val);
+  const renewalCost = Math.ceil(bodyCost / 2.5 / creepSize);
+  return renewalCost;
 };
 
 export {};

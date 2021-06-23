@@ -8,14 +8,6 @@ interface DepositOpts {
   amount?: number;
 }
 
-interface ManagedStationMemory<Type> {
-  roomName: string;
-  stationId: Id<Type>;
-  positions: OccupiablePosition[];
-  maintenanceCrewNames: string[];
-  linkId?: Id<StructureLink>;
-}
-
 type Concrete<Type> = {
   [Property in keyof Type]-?: Type[Property];
 };
@@ -38,7 +30,6 @@ interface HarvestJob {
 interface ResourceManagerMemory {
   spawns: Id<StructureSpawn>[];
   extensions: Id<StructureExtension>[];
-  sources: ManagedStationMemory<Source>[];
   containers: Id<StructureContainer>[];
   storageUnits: Id<StructureStorage>[];
   harvestQueue: [Id<Creep>, number][];

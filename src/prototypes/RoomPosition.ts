@@ -48,6 +48,12 @@ declare global {
     ): AnyOwnedStructure[];
 
     distanceTo(to: RoomPosition): number;
+
+    closest(...positions: RoomPosition[]): RoomPosition | undefined;
+
+    isWalkable(): boolean;
+
+    getAdjacent(diagonals?: boolean, walkable?: boolean): RoomPosition[];
   }
 }
 
@@ -133,6 +139,67 @@ RoomPosition.prototype.distanceTo = function (to) {
   const b = to.y - this.y;
 
   return Math.sqrt(Math.pow(a, 2) + Math.pow(b, 2));
+};
+
+RoomPosition.prototype.closest = function (...positions) {
+  if (!positions.length) return;
+
+  let closest: RoomPosition | undefined;
+  let smallestDistance = 0;
+
+  for (const pos of positions) {
+    const distance = this.distanceTo(pos);
+    if (distance < smallestDistance) {
+      closest = pos;
+      smallestDistance = distance;
+    }
+  }
+
+  return closest;
+};
+
+RoomPosition.prototype.isWalkable = function () {
+  const blocked = this.lookFor(LOOK_STRUCTURES).find(s => !s.isWalkable());
+  const walkable = this.lookFor(LOOK_STRUCTURES).find(s => s.isWalkable());
+  const terrain = Game.rooms[this.roomName].getTerrain();
+  const validTerrain =
+    terrain.get(this.x, this.y) !== TERRAIN_MASK_WALL || !!walkable;
+
+  return !blocked && validTerrain;
+};
+
+RoomPosition.prototype.getAdjacent = function (
+  diagonals = true,
+  walkable = false
+) {
+  const positions: RoomPosition[] = [];
+
+  if (diagonals) {
+    // Scan bordering spaces for occupiable positions
+    for (let x = this.x - 1; x <= this.x + 1; x++) {
+      for (let y = this.y - 1; y <= this.y + 1; y++) {
+        // stations aren't walkable, so skip
+        if (x === this.x && y === this.y) continue;
+        // Don't include positions outside the bounds of the room
+        if (x < 0 || x > 49 || y < 0 || y > 49) continue;
+
+        const adj = new RoomPosition(x, y, this.roomName);
+
+        if (walkable) {
+          if (adj.isWalkable()) positions.push(adj);
+        } else {
+          positions.push(adj);
+        }
+      }
+    }
+  } else {
+    positions.push(new RoomPosition(this.x - 1, this.y, this.roomName));
+    positions.push(new RoomPosition(this.x + 1, this.y, this.roomName));
+    positions.push(new RoomPosition(this.x, this.y - 1, this.roomName));
+    positions.push(new RoomPosition(this.x, this.y + 1, this.roomName));
+  }
+
+  return positions;
 };
 
 export {};

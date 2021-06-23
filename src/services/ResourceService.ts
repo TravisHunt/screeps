@@ -1,11 +1,5 @@
-import HarvestQueue from "managers/resource/HarvestQueue";
 import StatisticsService from "services/StatisticsServices";
-import {
-  ERR_CREEP_SPAWNING,
-  ERR_RESOURCE_NOT_IMPLEMENTED,
-  ResourceReturnCode
-} from "managers/resource/utils";
-import SourceService from "./SourceService";
+import SourceService2 from "./SourceService2";
 import * as utils from "../managers/resource/utils";
 import * as palette from "../palette";
 import {
@@ -14,18 +8,20 @@ import {
   isStoreStructure,
   StoreStructure
 } from "utils/typeGuards";
+import {
+  ERR_CREEP_SPAWNING,
+  ERR_RESOURCE_NOT_IMPLEMENTED,
+  ResourceReturnCode
+} from "managers/resource/utils";
 
 export default class ResourceService {
-  private memory: RoomMemory;
   private room: Room;
-  private sources: Source[] = [];
   private extensions: StructureExtension[] = [];
   private containers: StructureContainer[] = [];
   private storages: StructureStorage[] = [];
   private upgradeLink?: StructureLink;
   private storageLink?: StructureLink;
-  private harvestQueue: HarvestQueue;
-  private sourceService: SourceService;
+  private sourceService: SourceService2;
   private statService: StatisticsService;
 
   public getUpgradeLink(): StructureLink | undefined {
@@ -38,56 +34,44 @@ export default class ResourceService {
 
   public constructor(
     room: Room,
-    sources: Source[],
     extensions: StructureExtension[],
     containers: StructureContainer[],
     storages: StructureStorage[],
-    harvestQueue: HarvestQueue,
-    memory: RoomMemory,
     upgradeLink?: StructureLink,
     storageLink?: StructureLink
   ) {
-    this.memory = memory;
     this.room = room;
-    this.sources = sources;
     this.extensions = extensions;
     this.containers = containers;
     this.storages = storages;
-    this.harvestQueue = harvestQueue;
     this.upgradeLink = upgradeLink;
     this.storageLink = storageLink;
     this.statService = StatisticsService.getInstance();
-    this.sourceService = new SourceService(
-      this.room,
-      this.sources,
-      this.harvestQueue,
-      this.memory
-    );
+    this.sourceService = SourceService2.getInstance();
   }
 
   public get harvestPositionCount(): number {
-    return this.sourceService.harvestPositionCount;
+    return this.sourceService.totalHarvestPositionCountIn(this.room.name);
   }
 
   public run(): void {
-    // Run harvest jobs for creeps occupying harvest positions of sources.
-    this.sourceService.run();
-
-    // Do we have an empty upgrade link?
-    if (this.upgradeLink && this.upgradeLink.freeCapacity() > 0) {
-      // Any full source links?
-      const srcLink = this.sourceService.getReadyFullLink();
-      if (srcLink) {
+    // Any ready source links?
+    const srcLink = this.sourceService.link(this.room);
+    if (srcLink) {
+      // Prioritize upgrade link
+      if (
+        this.upgradeLink &&
+        this.upgradeLink.freeCapacity() <= srcLink.usedCapacity()
+      ) {
         srcLink.transferEnergy(this.upgradeLink);
-      }
-    }
-
-    // Do we have an empty storage link?
-    if (this.storageLink && this.storageLink.freeCapacity() > 0) {
-      // Any full source links?
-      const srcLink = this.sourceService.getReadyFullLink();
-      if (srcLink) {
-        srcLink.transferEnergy(this.storageLink);
+      } else {
+        // Decide which link will get the energy
+        const targetLink = [this.upgradeLink, this.storageLink]
+          .filter(l => l !== undefined)
+          .map(l => l as StructureLink)
+          .sort((a, b) => a.usedCapacity() - b.usedCapacity())
+          .shift();
+        if (targetLink) srcLink.transferEnergy(targetLink);
       }
     }
   }
@@ -123,11 +107,11 @@ export default class ResourceService {
   }
 
   public requestBuilds(): BuildRequest[] {
-    return this.sourceService.requestBuilds();
+    return this.sourceService.requestedBuildsIn(this.room.name);
   }
 
   public getInNeedOfRepair(): Structure<StructureConstant>[] {
-    return this.sourceService.getInNeedOfRepair();
+    return this.sourceService.requestedRoadRepairsIn(this.room.name);
   }
 
   /**
@@ -191,7 +175,8 @@ export default class ResourceService {
 
     // If we aren't pulling from a link, container, or storage, pass the
     // request on to the harvest queue.
-    return this.sourceService.submitRequest(requestor, opts);
+    // return this.sourceService.submitRequest(requestor, opts);
+    return ERR_RESOURCE_NOT_IMPLEMENTED;
   }
 
   private depositEnergy(creep: Creep, opts?: DepositOpts): ScreepsReturnCode {
@@ -206,11 +191,11 @@ export default class ResourceService {
     // 1) Source links
     // 2) Extensions
     // 3) Storage
-    const srcLinks = this.sourceService.getLinks();
+    const srcLinks = this.sourceService.links(this.room);
 
     if (srcLinks.length) {
       for (const link of srcLinks) {
-        if (!link.full()) {
+        if (link.freeCapacity() >= 300) {
           target = link;
           retCode = creep.transfer(
             target,
@@ -224,7 +209,9 @@ export default class ResourceService {
 
     if (!target && !retCode) {
       if (extWithSpace.length) {
-        target = extWithSpace[0];
+        target = extWithSpace.sort(
+          (a, b) => a.pos.distanceTo(creep.pos) - b.pos.distanceTo(creep.pos)
+        )[0];
         retCode = creep.transfer(target, RESOURCE_ENERGY, opts && opts.amount);
       } else if (
         this.room.storage &&

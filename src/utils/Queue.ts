@@ -89,4 +89,18 @@ export default class Queue<Type> implements IQueue<Type> {
   public contains(item: Type): boolean {
     return this._queue.indexOf(item) > -1;
   }
+
+  public position(item: Type): number {
+    return this._queue.indexOf(item);
+  }
+
+  public splice(start: number, deleteCount?: number): Type[] {
+    return this._queue.splice(start, deleteCount);
+  }
+
+  public remove(item: Type): boolean {
+    const index = this.position(item);
+    if (index > -1) this._queue.splice(index, 1);
+    return index > -1;
+  }
 }

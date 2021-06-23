@@ -3,8 +3,10 @@ import BuildManager from "managers/build/build.manager";
 import HarvestManager from "managers/harvest.manager";
 import Outpost from "managers/outpost/Outpost";
 import OutpostManager from "managers/outpost/OutpostManager";
-import HarvestQueue from "managers/resource/HarvestQueue";
 import UpgradeManager from "managers/upgrade.manager";
+import DeliveryService from "services/DeliveryService";
+import ResourceService from "services/ResourceService";
+import Queue from "utils/Queue";
 import {
   BUILDER_MAX,
   COURIER_MAX,
@@ -13,22 +15,16 @@ import {
   REPAIRMAN_MAX,
   UPGRADER_MAX
 } from "screeps.constants";
-import DeliveryService from "services/DeliveryService";
-import ResourceService from "services/ResourceService";
-import Queue from "utils/Queue";
 
 export default class RoomManager {
   public room: Room;
-  private sources: Source[] = [];
   private spawns: StructureSpawn[] = [];
   private extensions: StructureExtension[] = [];
   private containers: StructureContainer[] = [];
   private storages: StructureStorage[] = [];
-  private terminals: StructureTerminal[] = [];
   private couriers: Creep[] = [];
   private balancers: Creep[] = [];
   private outposts: Record<string, Outpost> = {};
-  private harvestQueue: HarvestQueue;
   private deliveryQueue: Queue<ResourceRequestFromBucket>;
   private upgradeLink?: StructureLink;
   private storageLink?: StructureLink;
@@ -80,12 +76,10 @@ export default class RoomManager {
     this.refreshLinks();
 
     // Build from stored ids
-    this.sources = RoomManager.idsToObjects(this.memory.sourceIds);
     this.spawns = RoomManager.idsToObjects(this.memory.spawnIds);
     this.extensions = RoomManager.idsToObjects(this.memory.extensionIds);
     this.containers = RoomManager.idsToObjects(this.memory.containerIds);
     this.storages = RoomManager.idsToObjects(this.memory.storageIds);
-    this.terminals = RoomManager.idsToObjects(this.memory.terminalIds);
 
     this.couriers = (this.memory.courierNames || [])
       .map(name => Game.creeps[name])
@@ -97,7 +91,6 @@ export default class RoomManager {
       .filter(c => c !== undefined);
     this.memory.balancerNames = this.balancers.map(c => c.name);
 
-    this.harvestQueue = new HarvestQueue(this.memory.harvestQueue);
     this.deliveryQueue = new Queue<ResourceRequestFromBucket>(
       this.memory.deliveryQueue
     );
@@ -110,18 +103,16 @@ export default class RoomManager {
     // Init service for managing access to source harvesting
     this.resourceService = new ResourceService(
       this.room,
-      this.sources,
       this.extensions,
       this.containers,
       this.storages,
-      this.harvestQueue,
-      this.memory,
       this.upgradeLink,
       this.storageLink
     );
 
     // Init Balancer
     this.balancer = new Balancer(
+      this.room,
       this.memory,
       this.spawns,
       this.extensions,
@@ -226,19 +217,14 @@ export default class RoomManager {
 
       buildQueue: [],
 
-      harvestQueue: [],
       deliveryQueue: [],
       courierNames: [],
       balancerNames: [],
 
-      managedSources: [],
-
       spawnIds: [],
       extensionIds: [],
-      sourceIds: [],
       containerIds: [],
       storageIds: [],
-      terminalIds: [],
       rampartIds: [],
       towerIds: [],
       wallIds: [],
@@ -248,13 +234,12 @@ export default class RoomManager {
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private static migrateMemory(memory: RoomMemory, room: Room): void {
     console.log("Memory migration not implemented!");
   }
 
   private refreshIdCollections(): void {
-    this.memory.sourceIds = this.room.find(FIND_SOURCES).map(s => s.id);
-
     const structures = this.room.find(FIND_STRUCTURES);
 
     this.memory.spawnIds = structures
@@ -272,10 +257,6 @@ export default class RoomManager {
     this.memory.storageIds = structures
       .filter(s => s.structureType === STRUCTURE_STORAGE)
       .map(s => s.id as Id<StructureStorage>);
-
-    this.memory.terminalIds = structures
-      .filter(s => s.structureType === STRUCTURE_TERMINAL)
-      .map(s => s.id as Id<StructureTerminal>);
 
     this.memory.rampartIds = structures
       .filter(s => s.structureType === STRUCTURE_RAMPART)

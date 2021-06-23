@@ -20,6 +20,7 @@ declare global {
      * Get my creeps in this room.
      */
     creeps(): Creep[];
+    creepsWithRole(role: string): Creep[];
     _creeps: Creep[];
 
     /**
@@ -89,6 +90,13 @@ Room.prototype.creeps = function () {
     this._creeps = this.find(FIND_MY_CREEPS);
   }
   return this._creeps;
+};
+
+Room.prototype.creepsWithRole = function (role) {
+  if (!this._creeps) {
+    this._creeps = this.find(FIND_MY_CREEPS);
+  }
+  return this._creeps.filter(c => c.memory.role === role);
 };
 // #endregion
 

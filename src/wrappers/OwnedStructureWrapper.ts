@@ -1,5 +1,3 @@
-import IOwnedStructure from "interfaces/IOwnedStructure";
-
 export default abstract class OwnedStructureWrapper<T extends OwnedStructure>
   implements IOwnedStructure {
   protected _target: T;

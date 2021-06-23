@@ -1,4 +1,3 @@
-import IRunnable from "interfaces/IRunnable";
 import Storage from "wrappers/Storage";
 
 type StorageTree = Record<string, Record<string, Storage>>;
@@ -18,9 +17,12 @@ export default class StorageService implements IRunnable {
     return {};
   }
 
-  public static getInstance(): StorageService {
+  public static getInstance(refresh = false): StorageService {
     if (!StorageService.instance) {
       StorageService.instance = new StorageService();
+    }
+    if (refresh) {
+      StorageService.instance.refresh();
     }
     return StorageService.instance;
   }
@@ -30,10 +32,10 @@ export default class StorageService implements IRunnable {
   }
 
   public run(): void {
-    this.refresh();
+    // this.refresh();
   }
 
-  public refresh(): void {
+  private refresh(): void {
     // Ensure we capture all rooms with storage units
     for (const roomName in Game.rooms) {
       const room = Game.rooms[roomName];

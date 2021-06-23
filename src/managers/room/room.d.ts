@@ -3,17 +3,13 @@ interface RoomMemory {
   state: RoomState;
   buildQueue: BuildMemory[];
   currentBuild?: BuildMemory;
-  harvestQueue: [Id<Creep>, number][];
   deliveryQueue: ResourceRequestFromBucket[];
   courierNames: string[];
   balancerNames: string[];
-  managedSources: ManagedStationMemory<Source>[];
   spawnIds: Id<StructureSpawn>[];
   extensionIds: Id<StructureExtension>[];
-  sourceIds: Id<Source>[];
   containerIds: Id<StructureContainer>[];
   storageIds: Id<StructureStorage>[];
-  terminalIds: Id<StructureTerminal>[];
   rampartIds: Id<StructureRampart>[];
   towerIds: Id<StructureTower>[];
   wallIds: Id<StructureWall>[];

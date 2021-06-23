@@ -1,5 +1,3 @@
-import IRunnable from "interfaces/IRunnable";
-
 export default class StatisticsService implements IRunnable {
   private static instance: StatisticsService;
 
