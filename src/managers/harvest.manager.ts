@@ -1,9 +1,7 @@
 import ManagerBase from "managers/base.manager";
 import { PATH_COLOR } from "palette";
 import * as constants from "screeps.constants";
-import SourceService2 from "services/SourceService2";
 import ResourceService from "services/ResourceService";
-import SpawnService from "services/SpawnService";
 import XPARTS from "utils/XPARTS";
 
 export default class HarvestManager extends ManagerBase {
@@ -11,8 +9,6 @@ export default class HarvestManager extends ManagerBase {
   public readonly harvesterMax: number;
   public harvesters: Creep[];
   private resourceService: ResourceService;
-  private spawnService: SpawnService;
-  private sourceService: SourceService2;
 
   public constructor(
     room: Room,
@@ -24,8 +20,6 @@ export default class HarvestManager extends ManagerBase {
 
     this.harvesterMax = harvesterMax;
     this.resourceService = resourceService;
-    this.spawnService = SpawnService.getInstance();
-    this.sourceService = SourceService2.getInstance();
 
     this.harvesters = _.filter(
       Game.creeps,
@@ -136,9 +130,6 @@ export default class HarvestManager extends ManagerBase {
           }
         }
       }
-      // this.resourceService.submitResourceRequest(harvester, RESOURCE_ENERGY, {
-      //   ignoreStores: true
-      // });
     } else {
       this.resourceService.deposit(harvester, RESOURCE_ENERGY);
     }

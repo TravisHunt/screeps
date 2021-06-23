@@ -9,7 +9,7 @@ export default class Storage extends OwnedStructureWrapper<StructureStorage> {
     super(storage);
   }
 
-  public get storage(): StructureStorage {
+  public get obj(): StructureStorage {
     return this._target;
   }
 
@@ -18,11 +18,15 @@ export default class Storage extends OwnedStructureWrapper<StructureStorage> {
   }
 
   public energy(): number {
-    return this.storage.energy();
+    return this.obj.energy();
+  }
+
+  public empty(): boolean {
+    return this.obj.empty();
   }
 
   public full(): boolean {
-    return this.storage.full();
+    return this.obj.full();
   }
 
   public reservesMet(): boolean {

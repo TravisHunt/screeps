@@ -3,6 +3,7 @@ import * as palette from "palette";
 import XPARTS from "utils/XPARTS";
 import { RENEW_THRESHOLD } from "screeps.constants";
 import ResourceService from "services/ResourceService";
+import { PATH_COLOR } from "palette";
 
 export default class UpgradeManager extends ManagerBase {
   public static readonly role = "upgrader";
@@ -38,54 +39,117 @@ export default class UpgradeManager extends ManagerBase {
     }
 
     for (const creep of this.creeps) {
-      this.doYourJob(creep, spawn);
+      this.doYourJob(creep);
     }
   }
 
-  public doYourJob(creep: Creep, spawn: StructureSpawn): void {
-    // TODO: make sure the creep is capable of this job
+  public doYourJob(creep: Creep): void {
+    // Check for renewal
     if (creep.ticksToLive && creep.ticksToLive < RENEW_THRESHOLD) {
+      creep.memory.harvesting = false;
       creep.memory.renewing = true;
+      if (creep.memory.harvestLock) {
+        // Abandon harvest position
+        this.sourceService.unlockHarvestPosition(creep.memory.harvestLock);
+        delete creep.memory.harvestLock;
+      }
     }
 
-    // Renew until full
-    if (creep.memory.renewing) {
-      const res = spawn.renewCreep(creep);
-      switch (res) {
+    // Ask spawn service if it's my turn to renew
+    if (this.spawnService.canRenew(creep)) {
+      const spawn = this.spawnService.getSpawnForRenewal(creep);
+
+      // Attempt to renew
+      const code = spawn.renewCreep(creep);
+      switch (code) {
+        case OK:
+          return;
         case ERR_NOT_IN_RANGE:
-          creep.moveTo(spawn);
-          break;
+          creep.moveTo(spawn, { visualizePathStyle: { stroke: PATH_COLOR } });
+          return;
         case ERR_FULL:
+          // Tell spawn service that I'm done renewing
+          this.spawnService.renewalComplete(creep);
           creep.memory.renewing = false;
           break;
+        default:
+          creep.say("Renew Error!");
+          console.log(`${creep.name} renew failed with code: ${code}`);
+          return;
       }
-      return;
+    } else if (creep.memory.renewing) {
+      // Trying to renew but it's not my turn or I haven't queued yet.
+      const position = this.spawnService.queueForRenewal(creep);
+      if (position === -1)
+        console.log(`Failed to queue ${creep.name} for renewal!`);
     }
 
     // Harvest if you have no more energy
-    if (
-      !creep.memory.harvesting &&
-      creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0
-    ) {
+    if (!creep.memory.harvesting && !creep.usedCapacity(RESOURCE_ENERGY)) {
       creep.memory.harvesting = true;
       creep.say("🔄 harvest");
     }
 
     // Upgrade if you're at carrying capacity
-    if (
-      creep.memory.harvesting &&
-      creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0
-    ) {
+    if (creep.memory.harvesting && !creep.freeCapacity(RESOURCE_ENERGY)) {
       creep.memory.harvesting = false;
       creep.say("⚡ upgrade");
+      // Return harvest position lock if we have one
+      const lock = creep.memory.harvestLock;
+      if (lock) {
+        this.sourceService.unlockHarvestPosition(lock);
+        delete creep.memory.harvestLock;
+      }
     }
 
     // Loop action: upgrade controller or harvest from energy source
     if (creep.memory.harvesting) {
-      this.resourceService.submitResourceRequest(creep, RESOURCE_ENERGY, {
-        upgrading: true
-      });
-      return;
+      // Prioritize the upgrade link if it exists
+      const link = this.resourceService.getUpgradeLink();
+      if (link && !link.empty()) {
+        if (creep.withdraw(link, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(link, {
+            visualizePathStyle: { stroke: palette.PATH_COLOR_HARVEST }
+          });
+        }
+        return;
+      }
+
+      // No upgrade link? Check for a storage container.
+      const storage = this.storageService.getNearestStorage(creep.pos);
+      if (storage && !storage.empty()) {
+        if (creep.withdraw(storage.obj, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+          creep.moveTo(storage, {
+            visualizePathStyle: { stroke: palette.PATH_COLOR_HARVEST }
+          });
+        }
+        return;
+      }
+
+      // If we're here we couldn't find an energy container. Let's try to
+      // claim a harvest position.
+      if (!creep.memory.harvestLock) {
+        const lock = this.sourceService.lockHarvestPosition(creep);
+        if (lock) creep.memory.harvestLock = lock;
+      }
+      // We obtained a lock, let's use it.
+      if (creep.memory.harvestLock) {
+        const lock = creep.memory.harvestLock;
+        // Move to locked position if we're not there.
+        if (creep.pos.isEqualTo(lock.x, lock.y) === false) {
+          creep.moveTo(lock.x, lock.y);
+        } else {
+          const source = Game.getObjectById(lock.sourceId);
+          if (!source) {
+            console.log(`Upgrader: Source ${lock.sourceId} not found!`);
+            this.sourceService.unlockHarvestPosition(lock);
+            delete creep.memory.harvestLock;
+          } else {
+            creep.harvest(source);
+          }
+        }
+        return;
+      }
     }
 
     if (creep.room.controller) {

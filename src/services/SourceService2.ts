@@ -69,22 +69,21 @@ export default class SourceService2 implements IRunnable {
   public run(): void {
     // Make sure we have maintainers to maintain harvest positions.
     _.each(this.lookup, room => {
-      // TODO: remove need for ownerTag
-      const owner = _.map(room.sources, src => src.source)[0];
-
-      // TODO: allow for multiple maintainers
-      if (room.maintainers.length < 1) {
-        this.maintenanceService.submitPersonnelRequest(room.roomName, owner.id);
-      }
-
       // Scan for spawning maintainers
       const spawns = Game.rooms[room.roomName].find(FIND_MY_SPAWNS);
       for (const s of spawns) {
         if (!s.spawning) continue;
         const spawning = Game.creeps[s.spawning.name];
-        if (spawning.memory.ownerTag && spawning.memory.ownerTag === owner.id) {
+        if (spawning.memory.role === RoleMaintainer) {
           room.maintainers.push(spawning);
         }
+      }
+
+      // TODO: allow for multiple maintainers
+      if (room.maintainers.length < 1) {
+        // TODO: remove need for ownerTag
+        const owner = _.map(room.sources, src => src.source)[0];
+        this.maintenanceService.submitPersonnelRequest(room.roomName, owner.id);
       }
 
       this.runMaintainers(room);
@@ -229,7 +228,6 @@ export default class SourceService2 implements IRunnable {
     const pos = bestSrc.availableHarvestPositions.find(p => !p.locked);
     if (pos) {
       pos.locked = true;
-      console.log(`${creep.name} locked position ${pos.toString()}`);
     }
 
     return pos;
@@ -371,12 +369,11 @@ export default class SourceService2 implements IRunnable {
       [] as StructureRoad[]
     );
 
-    if (!roads.length) return;
-
     for (const creep of available) {
       // If below the ticks to live threshold, we want to renew until full.
       if (creep.ticksToLive && creep.ticksToLive < RENEW_THRESHOLD) {
         creep.memory.renewing = true;
+        creep.memory.harvesting = false;
       }
 
       // Ask spawn service if it's my turn to renew
@@ -424,7 +421,7 @@ export default class SourceService2 implements IRunnable {
           }
         }
       } else {
-        if (creep.repair(roads[0]) === ERR_NOT_IN_RANGE) {
+        if (roads.length && creep.repair(roads[0]) === ERR_NOT_IN_RANGE) {
           creep.moveTo(roads[0], {
             visualizePathStyle: { stroke: PATH_COLOR_REPAIR }
           });

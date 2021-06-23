@@ -106,9 +106,9 @@ export const loop = ErrorMapper.wrapLoop(() => {
   const maintenanceService = MaintenanceService.getInstance();
   maintenanceService.run();
 
-  spawnService.run();
-  storageService.run();
   sourceService.run();
+  storageService.run();
+  spawnService.run();
 
   const statsService = StatisticsService.getInstance();
   statsService.run();

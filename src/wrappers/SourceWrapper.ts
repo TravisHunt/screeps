@@ -40,8 +40,12 @@ export default class SourceWrapper
     super(src);
 
     if (mem) {
+      // Scan for deposit link if we haven't found one yet.
+      if (!mem.linkId) {
+        const link = SourceWrapper.findDepositLink(src);
+        if (link) mem.linkId = link.id;
+      }
       if (mem.linkId) this.link = Game.getObjectById(mem.linkId);
-      if (!this.link) mem.linkId = undefined;
 
       this.harvestPositions = mem.harvestPositions.map(
         hp => new HarvestPosition(hp.x, hp.y, hp.roomName, src.id, hp.locked)
